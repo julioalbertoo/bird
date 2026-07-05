@@ -100,6 +100,14 @@
     }
     .top .name { font-size: 1.4rem; font-weight: 700; margin: 0; }
     .top .sci { font-style: italic; color: var(--muted); margin: 2px 0 0; font-size: 0.95rem; }
+    .top.noise {
+        background: linear-gradient(135deg, rgba(255,180,90,0.16), rgba(255,180,90,0.04));
+        border-color: rgba(255,180,90,0.4);
+    }
+    .top.noise .conf { color: #f0b46a; }
+    .top.noise .meter > span { background: #f0b46a; }
+    .top .lead { margin: 0 0 6px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .row.noise .n { color: #f0b46a; }
     .row {
         display: flex;
         align-items: center;
@@ -285,15 +293,58 @@ async function identify(pcm) {
     return [...bySpecies.values()].sort((a, b) => b.confidence - a.confidence);
 }
 
+// BirdNET también reconoce sonidos que no son de aves: los tratamos aparte.
+const NON_BIRD = {
+    'Dog':             { es: 'Ladrido de perro',     emoji: '🐕' },
+    'Engine':          { es: 'Motor',                emoji: '🚗' },
+    'Environmental':   { es: 'Ruido ambiental',      emoji: '🌫️' },
+    'Fireworks':       { es: 'Fuegos artificiales',  emoji: '🎆' },
+    'Gun':             { es: 'Disparo',              emoji: '💥' },
+    'Human non-vocal': { es: 'Sonido humano',        emoji: '👤' },
+    'Human vocal':     { es: 'Voz humana',           emoji: '🗣️' },
+    'Human whistle':   { es: 'Silbido humano',       emoji: '😗' },
+    'Noise':           { es: 'Ruido',                emoji: '🔊' },
+    'Power tools':     { es: 'Herramienta eléctrica', emoji: '🛠️' },
+    'Siren':           { es: 'Sirena',               emoji: '🚨' },
+};
+const nonBird = item => NON_BIRD[item.sciName] || null;
+
 function renderResults(list) {
     results.style.display = 'block';
     if (!list.length) {
-        resultsBody.innerHTML = '<div class="empty">No he reconocido ningún pájaro con claridad.<br>Prueba en un lugar con menos ruido o más cerca del canto.</div>';
+        resultsBody.innerHTML = '<div class="empty">No he reconocido nada con claridad.<br>Prueba en un lugar con menos ruido o más cerca del canto.</div>';
         return;
     }
-    const top = list[0];
     const pct = c => (c * 100).toFixed(0);
-    let html = `
+    const top = list[0];
+    const birds = list.filter(x => !nonBird(x));
+    let html;
+
+    if (nonBird(top)) {
+        // Lo más probable NO es un pájaro: mostramos un aviso claro.
+        const nb = nonBird(top);
+        html = `
+        <div class="top noise">
+            <p class="lead">No parece un pájaro</p>
+            <p class="name">${nb.emoji} ${escapeHtml(nb.es)}</p>
+            <p class="sci">Esto suena a un sonido de fondo, no a un ave.</p>
+            <div class="row" style="border:none;padding:8px 0 0">
+                <div class="meter"><span style="width:${pct(top.confidence)}%"></span></div>
+                <div class="conf">${pct(top.confidence)}%</div>
+            </div>
+        </div>`;
+        if (birds.length) {
+            html += `<h2 style="margin-top:20px">Posibles aves de fondo</h2>`;
+            html += birds.slice(0, 4).map(rowHtml).join('');
+        } else {
+            html += `<div class="empty">No he detectado ningún pájaro por debajo del ruido.<br>Prueba de nuevo con menos ruido de fondo.</div>`;
+        }
+        resultsBody.innerHTML = html;
+        return;
+    }
+
+    // Caso normal: el resultado principal es un ave (o rana/insecto que canta).
+    html = `
         <div class="top">
             <p class="name">${escapeHtml(cap(top.name || top.enName || top.sciName))}</p>
             <p class="sci">${escapeHtml(top.sciName)}${top.enName ? ' · ' + escapeHtml(top.enName) : ''}</p>
@@ -303,18 +354,35 @@ function renderResults(list) {
             </div>
         </div>`;
     const rest = list.slice(1, 5);
-    if (rest.length) {
-        html += rest.map(b => `
-            <div class="row">
+    if (rest.length) html += rest.map(rowHtml).join('');
+    resultsBody.innerHTML = html;
+
+    function rowHtml(b) { return renderRow(b, pct); }
+}
+
+// Una fila de la lista: aves con nombre científico; sonidos no-ave con su etiqueta.
+function renderRow(b, pct) {
+    const nb = nonBird(b);
+    if (nb) {
+        return `
+            <div class="row noise">
                 <div class="info">
-                    <div class="n">${escapeHtml(cap(b.name || b.enName || b.sciName))}</div>
-                    <div class="s">${escapeHtml(b.sciName)}</div>
+                    <div class="n">${nb.emoji} ${escapeHtml(nb.es)}</div>
+                    <div class="s">sonido de fondo</div>
                 </div>
                 <div class="meter"><span style="width:${pct(b.confidence)}%"></span></div>
                 <div class="conf">${pct(b.confidence)}%</div>
-            </div>`).join('');
+            </div>`;
     }
-    resultsBody.innerHTML = html;
+    return `
+        <div class="row">
+            <div class="info">
+                <div class="n">${escapeHtml(cap(b.name || b.enName || b.sciName))}</div>
+                <div class="s">${escapeHtml(b.sciName)}</div>
+            </div>
+            <div class="meter"><span style="width:${pct(b.confidence)}%"></span></div>
+            <div class="conf">${pct(b.confidence)}%</div>
+        </div>`;
 }
 
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
