@@ -4,18 +4,49 @@
 // any base path (e.g. a GitHub Pages project subpath).
 importScripts('vendor/tf.min.js')
 
+// The model weighs ~60 MB, so every network fetch (model shards, geo model,
+// labels) goes through the Cache API: the first visit downloads and stores it,
+// later visits load it from disk without touching the network. Bump the cache
+// name if the model files ever change.
+const CACHE_NAME = 'birdnet-model-v1'
+
+async function openCache() {
+    try { return await caches.open(CACHE_NAME) }
+    catch (_) { return null } // Cache API unavailable (e.g. some private modes)
+}
+
+async function cachedFetch(url, init) {
+    const cache = await openCache()
+    if (cache) {
+        const hit = await cache.match(url)
+        if (hit) return hit
+    }
+    const res = await fetch(url, init)
+    if (cache && res.ok) {
+        try { await cache.put(url, res.clone()) }
+        catch (_) { /* storage quota exceeded — keep serving from network */ }
+    }
+    return res
+}
+
+async function isModelCached() {
+    const cache = await openCache()
+    return !!(cache && await cache.match('models/birdnet/model.json'))
+}
+
 main()
 async function main() {
     await tf.setBackend('webgl')
+    postMessage({ message: 'cache_status', cached: await isModelCached() })
     const BirdNetJS = await predictModel()
     postMessage({ message: 'warmup', progress: 70 })
     await BirdNetJS.warmup()
     postMessage({ message: 'load_geomodel', progress: 90 })
-    const areaModel = await tf.loadGraphModel('models/birdnet/area-model/model.json')
+    const areaModel = await tf.loadGraphModel('models/birdnet/area-model/model.json', { fetchFunc: cachedFetch })
     postMessage({ message: 'load_labels', progress: 95 })
     // en_us.txt gives "Scientific_English name"; es.txt gives "Scientific_Nombre en español".
-    const birdsSci = (await fetch('models/birdnet/labels/en_us.txt').then(r => r.text())).split('\n')
-    const birdsEs  = (await fetch('models/birdnet/labels/es.txt').then(r => r.text())).split('\n')
+    const birdsSci = (await cachedFetch('models/birdnet/labels/en_us.txt').then(r => r.text())).split('\n')
+    const birdsEs  = (await cachedFetch('models/birdnet/labels/es.txt').then(r => r.text())).split('\n')
     const birds = new Array(birdsSci.length)
     for (let i = 0; i < birdsSci.length; i++) {
         birds[i] = {
@@ -60,6 +91,7 @@ async function main() {
 
 async function predictModel() {
     const BirdNetJS = await tf.loadLayersModel('models/birdnet/model.json', {
+        fetchFunc: cachedFetch,
         onProgress: (progress) => postMessage({ message: 'load_model', progress: progress * 70 | 0 })
     })
     async function predict(signal) {
