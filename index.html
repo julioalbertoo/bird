@@ -301,6 +301,14 @@
     }
     footer a { color: var(--text); font-weight: 600; text-decoration: none; }
     footer a:hover { color: var(--green); text-decoration: underline; }
+    footer .version {
+        margin-top: 14px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--track);
+        font-variant-numeric: tabular-nums;
+    }
 </style>
 </head>
 <body>
@@ -348,6 +356,8 @@
         <a href="https://birdnet.cornell.edu" target="_blank" rel="noopener">K. Lisa Yang Center for Conservation Bioacoustics · Cornell</a>.<br>
         Todo el procesamiento ocurre en tu navegador; el audio no se sube a ningún servidor.<br>
         El modelo se guarda en tu dispositivo: solo se descarga la primera vez.
+        <!-- APP_VERSION: incrementar en cada push a main -->
+        <div class="version">v1.0.0</div>
     </footer>
 </div>
 

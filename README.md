@@ -76,6 +76,13 @@ motor, 🗣️ voz…). La lista se ordena de más a menos frecuente.
   veces en la misma grabación solo cuenta una vez.
 - El botón **Borrar** vacía el historial.
 
+## Versión
+
+El pie de página muestra la **versión** de la app (p. ej. `v1.0.0`). Es un
+número incremental que sube en cada push a `main`: el dígito de parche aumenta
+en uno por publicación (`v1.0.0` → `v1.0.1` → …). La constante vive en el
+`<div class="version">` de `index.html`, junto al comentario `APP_VERSION`.
+
 ## Despliegue
 
 Es una web estática; funciona tal cual en GitHub Pages (usa rutas relativas,
