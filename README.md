@@ -63,6 +63,19 @@ BirdNET también reconoce sonidos que no son de aves (perro, motor, voz humana,
 sirena…). Si el resultado más probable es uno de esos, la interfaz lo señala
 como "No parece un pájaro" y lista aparte las posibles aves de fondo.
 
+## Historial: recuento de lo escuchado
+
+Al final de la página se muestra **"Lo que has escuchado"**: un recuento de cada
+ave o sonido detectado y el número de veces, con un icono representativo (🐦
+para las aves y el emoji correspondiente para los sonidos no-ave: 🐕 perro, 🚗
+motor, 🗣️ voz…). La lista se ordena de más a menos frecuente.
+
+- Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a
+  ningún sitio y persiste entre visitas.
+- Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
+  veces en la misma grabación solo cuenta una vez.
+- El botón **Borrar** vacía el historial.
+
 ## Despliegue
 
 Es una web estática; funciona tal cual en GitHub Pages (usa rutas relativas,

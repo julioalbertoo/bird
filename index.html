@@ -218,6 +218,80 @@
     .meter > span { display: block; height: 100%; border-radius: 9999px; background: var(--green); }
     .empty { color: var(--subdued); text-align: center; padding: 14px 0; line-height: 1.6; }
 
+    /* Historial acumulado — recuento de todo lo escuchado (guardado en el dispositivo) */
+    .history-card {
+        background: var(--surface);
+        border-radius: 8px;
+        padding: 22px 24px;
+        margin-top: 20px;
+        box-shadow: var(--shadow-heavy);
+    }
+    .hist-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+    }
+    .hist-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--subdued);
+        margin: 0;
+    }
+    .clear-btn {
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--subdued);
+        background: transparent;
+        border: 1px solid var(--track);
+        border-radius: 9999px;
+        padding: 6px 14px;
+        cursor: pointer;
+        transition: color .15s ease, border-color .15s ease;
+    }
+    .clear-btn:hover { color: var(--text); border-color: var(--subdued); }
+    .hist-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        transition: background .15s ease;
+    }
+    .hist-row:hover { background: var(--surface-3); }
+    .hist-emoji {
+        flex: 0 0 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: var(--surface-2);
+        border-radius: 6px;
+    }
+    .hist-row .info { flex: 1; min-width: 0; }
+    .hist-row .n { font-weight: 700; font-size: 0.98rem; }
+    .hist-row .s { font-style: italic; color: var(--subdued); font-size: 0.83rem; margin-top: 1px; }
+    .hist-count {
+        flex: 0 0 auto;
+        font-variant-numeric: tabular-nums;
+        font-weight: 900;
+        font-size: 1.05rem;
+        color: var(--green);
+    }
+    .hist-count span {
+        color: var(--subdued);
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-left: 2px;
+    }
+    .hist-row.noise .hist-count { color: var(--warn); }
+
     footer {
         text-align: center;
         color: var(--subdued);
@@ -261,6 +335,14 @@
         </div>
     </main>
 
+    <section id="history" class="history-card" hidden>
+        <div class="hist-head">
+            <h2 class="hist-title">Lo que has escuchado</h2>
+            <button id="clearHistory" class="clear-btn" type="button">Borrar</button>
+        </div>
+        <div id="historyBody"></div>
+    </section>
+
     <footer>
         Detección con el modelo <strong>BirdNET</strong> del
         <a href="https://birdnet.cornell.edu" target="_blank" rel="noopener">K. Lisa Yang Center for Conservation Bioacoustics · Cornell</a>.<br>
@@ -285,6 +367,9 @@ const barPct = el('barPct');
 const countdown = el('countdown');
 const results = el('results');
 const resultsBody = el('resultsBody');
+const historySection = el('history');
+const historyBody = el('historyBody');
+const clearHistoryBtn = el('clearHistory');
 
 let birdNet = null;       // promise-based worker interface
 let busy = false;
@@ -447,13 +532,15 @@ function renderResults(list) {
                 <div class="conf">${pct(top.confidence)}%</div>
             </div>
         </div>`;
+        const bgBirds = birds.slice(0, 4);
         if (birds.length) {
             html += `<h2 class="sub-heading">Posibles aves de fondo</h2>`;
-            html += birds.slice(0, 4).map((b, i) => renderRow(b, pct, i + 1)).join('');
+            html += bgBirds.map((b, i) => renderRow(b, pct, i + 1)).join('');
         } else {
             html += `<div class="empty">No he detectado ningún pájaro por debajo del ruido.<br>Prueba de nuevo con menos ruido de fondo.</div>`;
         }
         resultsBody.innerHTML = html;
+        addToHistory([top, ...bgBirds]);
         return;
     }
 
@@ -474,6 +561,7 @@ function renderResults(list) {
         html += rest.map((b, i) => renderRow(b, pct, i + 2)).join('');
     }
     resultsBody.innerHTML = html;
+    addToHistory([top, ...rest]);
 }
 
 // Una fila de la lista: aves con nombre científico; sonidos no-ave con su etiqueta.
@@ -505,6 +593,66 @@ function renderRow(b, pct, idx) {
 
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---- Historial local: recuento de todo lo escuchado, guardado en el dispositivo ----
+const HISTORY_KEY = 'birdnet_history_v1';
+
+function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || {}; }
+    catch (_) { return {}; }
+}
+function saveHistory(h) {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (_) { /* modo privado / sin espacio */ }
+}
+
+// Convierte una detección en una entrada de historial con su icono representativo.
+function toHistItem(x) {
+    const nb = nonBird(x);
+    if (nb) return { key: x.sciName, label: nb.es, emoji: nb.emoji, sci: '', isBird: false };
+    return { key: x.sciName, label: cap(x.name || x.enName || x.sciName), emoji: '🐦', sci: x.sciName, isBird: true };
+}
+
+// Suma +1 por cada especie/sonido mostrado (una vez por grabación).
+function addToHistory(items) {
+    if (!items.length) return;
+    const h = loadHistory();
+    const seen = new Set();
+    for (const x of items) {
+        const it = toHistItem(x);
+        if (seen.has(it.key)) continue;   // no contar dos veces en la misma grabación
+        seen.add(it.key);
+        const cur = h[it.key] || { count: 0 };
+        cur.count += 1;
+        cur.label = it.label;
+        cur.emoji = it.emoji;
+        cur.sci = it.sci;
+        cur.isBird = it.isBird;
+        h[it.key] = cur;
+    }
+    saveHistory(h);
+    renderHistory();
+}
+
+function renderHistory() {
+    const h = loadHistory();
+    const entries = Object.entries(h).sort((a, b) => b[1].count - a[1].count);
+    if (!entries.length) { historySection.hidden = true; return; }
+    historySection.hidden = false;
+    historyBody.innerHTML = entries.map(([, v]) => `
+        <div class="hist-row${v.isBird ? '' : ' noise'}">
+            <div class="hist-emoji">${v.emoji}</div>
+            <div class="info">
+                <div class="n">${escapeHtml(v.label)}</div>
+                ${v.sci ? `<div class="s">${escapeHtml(v.sci)}</div>` : ''}
+            </div>
+            <div class="hist-count">${v.count}<span>×</span></div>
+        </div>`).join('');
+}
+
+clearHistoryBtn.addEventListener('click', () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+    renderHistory();
+});
 
 // ---- Main record + identify flow ----
 async function run() {
@@ -548,6 +696,7 @@ async function run() {
 recordBtn.addEventListener('click', run);
 
 (async function init() {
+    renderHistory();
     try {
         setBar(0);
         showBar(true);
