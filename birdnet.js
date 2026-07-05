@@ -10,6 +10,11 @@ importScripts('vendor/tf.min.js')
 // name if the model files ever change.
 const CACHE_NAME = 'birdnet-model-v1'
 
+// Every asset goes through cachedFetch, so counting completed calls gives the
+// UI a load percentage that works both for network downloads and cache reads.
+const TOTAL_FETCHES = 19 // 1 model.json + 13 weight shards + 1 area model.json + 2 area shards + 2 label files
+let fetchesDone = 0
+
 async function openCache() {
     try { return await caches.open(CACHE_NAME) }
     catch (_) { return null } // Cache API unavailable (e.g. some private modes)
@@ -17,15 +22,16 @@ async function openCache() {
 
 async function cachedFetch(url, init) {
     const cache = await openCache()
-    if (cache) {
-        const hit = await cache.match(url)
-        if (hit) return hit
+    let res = cache ? await cache.match(url) : null
+    if (!res) {
+        res = await fetch(url, init)
+        if (cache && res.ok) {
+            try { await cache.put(url, res.clone()) }
+            catch (_) { /* storage quota exceeded — keep serving from network */ }
+        }
     }
-    const res = await fetch(url, init)
-    if (cache && res.ok) {
-        try { await cache.put(url, res.clone()) }
-        catch (_) { /* storage quota exceeded — keep serving from network */ }
-    }
+    fetchesDone += 1
+    postMessage({ message: 'fetch_progress', done: fetchesDone, total: TOTAL_FETCHES })
     return res
 }
 
@@ -38,12 +44,13 @@ main()
 async function main() {
     await tf.setBackend('webgl')
     postMessage({ message: 'cache_status', cached: await isModelCached() })
+    postMessage({ message: 'load_model' })
     const BirdNetJS = await predictModel()
-    postMessage({ message: 'warmup', progress: 70 })
+    postMessage({ message: 'warmup' })
     await BirdNetJS.warmup()
-    postMessage({ message: 'load_geomodel', progress: 90 })
+    postMessage({ message: 'load_geomodel' })
     const areaModel = await tf.loadGraphModel('models/birdnet/area-model/model.json', { fetchFunc: cachedFetch })
-    postMessage({ message: 'load_labels', progress: 95 })
+    postMessage({ message: 'load_labels' })
     // en_us.txt gives "Scientific_English name"; es.txt gives "Scientific_Nombre en español".
     const birdsSci = (await cachedFetch('models/birdnet/labels/en_us.txt').then(r => r.text())).split('\n')
     const birdsEs  = (await cachedFetch('models/birdnet/labels/es.txt').then(r => r.text())).split('\n')
@@ -90,10 +97,7 @@ async function main() {
 }
 
 async function predictModel() {
-    const BirdNetJS = await tf.loadLayersModel('models/birdnet/model.json', {
-        fetchFunc: cachedFetch,
-        onProgress: (progress) => postMessage({ message: 'load_model', progress: progress * 70 | 0 })
-    })
+    const BirdNetJS = await tf.loadLayersModel('models/birdnet/model.json', { fetchFunc: cachedFetch })
     async function predict(signal) {
         const resTensor = BirdNetJS.predict(signal)
         signal.dispose()

@@ -108,13 +108,18 @@
     }
     @keyframes pulse { 50% { opacity: 0.25; } }
 
-    .bar-track {
+    .load-row {
+        display: none;
+        align-items: center;
+        gap: 12px;
         margin-top: 20px;
+    }
+    .bar-track {
+        flex: 1;
         height: 4px;
         border-radius: 9999px;
         background: var(--track);
         overflow: hidden;
-        display: none;
     }
     .bar-fill {
         height: 100%;
@@ -122,6 +127,14 @@
         border-radius: 9999px;
         background: var(--green);
         transition: width .2s ease;
+    }
+    .bar-pct {
+        min-width: 42px;
+        text-align: right;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--subdued);
+        font-variant-numeric: tabular-nums;
     }
     .status {
         margin-top: 16px;
@@ -235,7 +248,10 @@
             <span id="btnLabel">Cargando modelo…</span>
         </button>
         <div id="countdown" class="countdown">10</div>
-        <div id="barTrack" class="bar-track"><div id="barFill" class="bar-fill"></div></div>
+        <div id="loadRow" class="load-row">
+            <div class="bar-track"><div id="barFill" class="bar-fill"></div></div>
+            <div id="barPct" class="bar-pct">0%</div>
+        </div>
         <div id="status" class="status" aria-live="polite">Preparando BirdNET…</div>
         <div id="error" class="error"></div>
 
@@ -263,8 +279,9 @@ const recordBtn = el('recordBtn');
 const btnLabel = el('btnLabel');
 const statusEl = el('status');
 const errorEl = el('error');
-const barTrack = el('barTrack');
+const loadRow = el('loadRow');
 const barFill = el('barFill');
+const barPct = el('barPct');
 const countdown = el('countdown');
 const results = el('results');
 const resultsBody = el('resultsBody');
@@ -274,6 +291,12 @@ let busy = false;
 
 function setStatus(t) { statusEl.textContent = t || ''; }
 function setError(t) { errorEl.textContent = t || ''; }
+function showBar(show) { loadRow.style.display = show ? 'flex' : 'none'; }
+function setBar(pct) {
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    barFill.style.width = pct + '%';
+    barPct.textContent = pct + '%';
+}
 
 // ---- Load the BirdNET worker (model + labels) ----
 function loadBirdNet() {
@@ -293,7 +316,8 @@ function loadBirdNet() {
     return new Promise((resolve, reject) => {
         let fromCache = false;
         function onLoading({ data }) {
-            if (typeof data.progress === 'number') { barFill.style.width = data.progress + '%'; }
+            // Cada petición completada (modelo, shards, etiquetas…) avanza la barra.
+            if (data.message === 'fetch_progress') { setBar(data.done / data.total * 95); return; }
             if (data.message === 'cache_status') { fromCache = !!data.cached; return; }
             const labels = {
                 load_model: fromCache
@@ -305,6 +329,7 @@ function loadBirdNet() {
             };
             if (labels[data.message]) setStatus(labels[data.message]);
             if (data.message === 'loaded') {
+                setBar(100);
                 worker.removeEventListener('message', onLoading);
                 resolve(call);
             }
@@ -377,7 +402,7 @@ async function identify(pcm) {
             if (!prev || p.confidence > prev.confidence) bySpecies.set(p.sciName, p);
         }
         processed += CHUNK_3S;
-        barFill.style.width = Math.min(100, processed / pcm.length * 100) + '%';
+        setBar(processed / pcm.length * 100);
     }
     return [...bySpecies.values()].sort((a, b) => b.confidence - a.confidence);
 }
@@ -491,15 +516,15 @@ async function run() {
     recordBtn.disabled = true;
     recordBtn.classList.add('recording');
     btnLabel.textContent = 'Grabando…';
-    barTrack.style.display = 'none';
+    showBar(false);
 
     try {
         const pcm = await recordMic(RECORD_MS);
         recordBtn.classList.remove('recording');
         btnLabel.textContent = 'Analizando…';
         setStatus('Escuchando el audio con BirdNET…');
-        barTrack.style.display = 'block';
-        barFill.style.width = '0%';
+        setBar(0);
+        showBar(true);
         const list = await identify(pcm);
         renderResults(list);
         setStatus('Listo. Pulsa para grabar de nuevo.');
@@ -513,7 +538,7 @@ async function run() {
         setStatus('');
     } finally {
         recordBtn.classList.remove('recording');
-        barTrack.style.display = 'none';
+        showBar(false);
         btnLabel.textContent = 'Grabar 10 segundos';
         recordBtn.disabled = false;
         busy = false;
@@ -524,9 +549,10 @@ recordBtn.addEventListener('click', run);
 
 (async function init() {
     try {
-        barTrack.style.display = 'block';
+        setBar(0);
+        showBar(true);
         birdNet = await loadBirdNet();
-        barTrack.style.display = 'none';
+        showBar(false);
         setStatus('Buscando tu ubicación (opcional)…');
         await applyGeolocation(birdNet);
         setStatus('Listo. Pulsa para grabar 10 segundos.');
