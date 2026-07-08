@@ -277,6 +277,12 @@
     .hist-row .info { flex: 1; min-width: 0; }
     .hist-row .n { font-weight: 700; font-size: 0.98rem; }
     .hist-row .s { font-style: italic; color: var(--subdued); font-size: 0.83rem; margin-top: 1px; }
+    .hist-row .conf-hist {
+        color: var(--subdued);
+        font-size: 0.78rem;
+        font-variant-numeric: tabular-nums;
+        margin-top: 2px;
+    }
     .hist-count {
         flex: 0 0 auto;
         font-variant-numeric: tabular-nums;
@@ -617,12 +623,14 @@ function saveHistory(h) {
 
 // Convierte una detección en una entrada de historial con su icono representativo.
 function toHistItem(x) {
+    const conf = typeof x.confidence === 'number' ? x.confidence : null;
     const nb = nonBird(x);
-    if (nb) return { key: x.sciName, label: nb.es, emoji: nb.emoji, sci: '', isBird: false };
-    return { key: x.sciName, label: cap(x.name || x.enName || x.sciName), emoji: '🐦', sci: x.sciName, isBird: true };
+    if (nb) return { key: x.sciName, label: nb.es, emoji: nb.emoji, sci: '', isBird: false, conf };
+    return { key: x.sciName, label: cap(x.name || x.enName || x.sciName), emoji: '🐦', sci: x.sciName, isBird: true, conf };
 }
 
-// Suma +1 por cada especie/sonido mostrado (una vez por grabación).
+// Suma +1 por cada especie/sonido mostrado (una vez por grabación) y guarda
+// la confianza de esa detección, para conservar todas las confianzas históricas.
 function addToHistory(items) {
     if (!items.length) return;
     const h = loadHistory();
@@ -631,8 +639,10 @@ function addToHistory(items) {
         const it = toHistItem(x);
         if (seen.has(it.key)) continue;   // no contar dos veces en la misma grabación
         seen.add(it.key);
-        const cur = h[it.key] || { count: 0 };
+        const cur = h[it.key] || { count: 0, confs: [] };
+        if (!Array.isArray(cur.confs)) cur.confs = [];   // migra entradas antiguas sin confianzas
         cur.count += 1;
+        if (it.conf !== null) cur.confs.push(Math.round(it.conf * 10000) / 10000);
         cur.label = it.label;
         cur.emoji = it.emoji;
         cur.sci = it.sci;
@@ -643,20 +653,34 @@ function addToHistory(items) {
     renderHistory();
 }
 
+// Resumen de las confianzas guardadas: última, media y máxima (en %).
+function confSummary(confs) {
+    if (!Array.isArray(confs) || !confs.length) return '';
+    const pct = c => (c * 100).toFixed(0);
+    const last = confs[confs.length - 1];
+    const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
+    const max = Math.max(...confs);
+    return `últ. ${pct(last)}% · med. ${pct(avg)}% · máx. ${pct(max)}%`;
+}
+
 function renderHistory() {
     const h = loadHistory();
     const entries = Object.entries(h).sort((a, b) => b[1].count - a[1].count);
     if (!entries.length) { historySection.hidden = true; return; }
     historySection.hidden = false;
-    historyBody.innerHTML = entries.map(([, v]) => `
+    historyBody.innerHTML = entries.map(([, v]) => {
+        const conf = confSummary(v.confs);
+        return `
         <div class="hist-row${v.isBird ? '' : ' noise'}">
             <div class="hist-emoji">${v.emoji}</div>
             <div class="info">
                 <div class="n">${escapeHtml(v.label)}</div>
                 ${v.sci ? `<div class="s">${escapeHtml(v.sci)}</div>` : ''}
+                ${conf ? `<div class="conf-hist">${conf}</div>` : ''}
             </div>
             <div class="hist-count">${v.count}<span>×</span></div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 clearHistoryBtn.addEventListener('click', () => {

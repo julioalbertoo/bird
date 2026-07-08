@@ -74,6 +74,9 @@ motor, 🗣️ voz…). La lista se ordena de más a menos frecuente.
   ningún sitio y persiste entre visitas.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
   veces en la misma grabación solo cuenta una vez.
+- Además del recuento, se guardan **todas las confianzas** de cada especie (una
+  por grabación en que aparece). Bajo cada entrada se muestra un resumen con la
+  **última**, la **media** y la **máxima** confianza registradas.
 - El botón **Borrar** vacía el historial.
 
 ## Versión
