@@ -473,7 +473,7 @@
     <header>
         <p class="eyebrow">Identificador de cantos</p>
         <h1>🐦 ¿Qué pájaro es?</h1>
-        <p class="tagline">Graba 10 segundos con tu micrófono y te digo qué ave suena.</p>
+        <p class="tagline">Escucha 10 segundos con tu micrófono y te digo qué ave suena.</p>
     </header>
 
     <main class="card">
@@ -997,7 +997,7 @@ async function run() {
     resultsBody.innerHTML = '';
     recordBtn.disabled = true;
     recordBtn.classList.add('recording');
-    btnLabel.textContent = 'Grabando…';
+    btnLabel.textContent = 'Escuchando…';
     showBar(false);
 
     try {
@@ -1013,7 +1013,7 @@ async function run() {
         const list = await identify(pcm);
         await pos;
         renderResults(list);
-        setStatus('Listo. Pulsa para grabar de nuevo.');
+        setStatus('Listo. Pulsa para escuchar de nuevo.');
     } catch (e) {
         console.error(e);
         if (e.name === 'NotAllowedError') {
@@ -1025,7 +1025,7 @@ async function run() {
     } finally {
         recordBtn.classList.remove('recording');
         showBar(false);
-        btnLabel.textContent = 'Grabar 10 segundos';
+        btnLabel.textContent = 'Escuchar 10 segundos';
         recordBtn.disabled = false;
         busy = false;
     }
@@ -1042,8 +1042,8 @@ recordBtn.addEventListener('click', run);
         showBar(false);
         setStatus('Buscando tu ubicación (opcional)…');
         await applyGeolocation(birdNet);
-        setStatus('Listo. Pulsa para grabar 10 segundos.');
-        btnLabel.textContent = 'Grabar 10 segundos';
+        setStatus('Listo. Pulsa para escuchar 10 segundos.');
+        btnLabel.textContent = 'Escuchar 10 segundos';
         recordBtn.disabled = false;
     } catch (e) {
         console.error(e);

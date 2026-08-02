@@ -1,6 +1,6 @@
 # 🐦 ¿Qué pájaro es?
 
-Página web que graba **10 segundos** desde tu micrófono y te dice qué ave ha
+Página web que escucha **10 segundos** desde tu micrófono y te dice qué ave ha
 escuchado, usando el modelo **[BirdNET](https://birdnet.cornell.edu)** del
 K. Lisa Yang Center for Conservation Bioacoustics (Cornell).
 
@@ -18,7 +18,7 @@ python3 -m http.server 8000
 ```
 
 1. Espera a que cargue el modelo (~50 MB, la primera vez).
-2. Pulsa **Grabar 10 segundos** y acerca el micrófono al canto.
+2. Pulsa **Escuchar 10 segundos** y acerca el micrófono al canto.
 3. Verás la especie más probable y hasta 4 alternativas con su confianza.
 
 Opcionalmente puedes permitir la geolocalización: BirdNET la usa para priorizar
