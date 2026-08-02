@@ -240,21 +240,6 @@
         color: var(--subdued);
         margin: 0;
     }
-    .clear-btn {
-        font-family: inherit;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: var(--subdued);
-        background: transparent;
-        border: 1px solid var(--track);
-        border-radius: 9999px;
-        padding: 6px 14px;
-        cursor: pointer;
-        transition: color .15s ease, border-color .15s ease;
-    }
-    .clear-btn:hover { color: var(--text); border-color: var(--subdued); }
 
     /* Cartas tipo Ultimate Team — 3 por fila, ampliables al pulsarlas */
     .cards-grid {
@@ -511,7 +496,6 @@
     <section id="history" class="history-card" hidden>
         <div class="hist-head">
             <h2 class="hist-title">Tu colección</h2>
-            <button id="clearHistory" class="clear-btn" type="button">Borrar</button>
         </div>
         <div id="historyBody" class="cards-grid"></div>
     </section>
@@ -548,7 +532,6 @@ const results = el('results');
 const resultsBody = el('resultsBody');
 const historySection = el('history');
 const historyBody = el('historyBody');
-const clearHistoryBtn = el('clearHistory');
 
 let birdNet = null;       // promise-based worker interface
 let busy = false;
@@ -986,11 +969,6 @@ function renderHistory() {
     historyBody.innerHTML = entries.map(([key, v]) => renderCard(key, v)).join('');
 }
 
-clearHistoryBtn.addEventListener('click', () => {
-    try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
-    closeCard();
-    renderHistory();
-});
 
 // ---- Main record + identify flow ----
 async function run() {

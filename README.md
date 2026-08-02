@@ -100,7 +100,6 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
   su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas. Lo
   mismo con la fecha y el sitio del `MÁX`: no se muestran hasta que batas esa
   marca con una escucha nueva.
-- El botón **Borrar** vacía la colección.
 
 ## Versión
 
