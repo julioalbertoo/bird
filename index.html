@@ -255,54 +255,180 @@
         transition: color .15s ease, border-color .15s ease;
     }
     .clear-btn:hover { color: var(--text); border-color: var(--subdued); }
-    .hist-row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 8px 12px;
-        border-radius: 6px;
-        transition: background .15s ease;
+
+    /* Cartas tipo Ultimate Team — 3 por fila, ampliables al pulsarlas */
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
     }
-    .hist-row:hover { background: var(--surface-3); }
-    .hist-emoji {
-        flex: 0 0 40px;
-        height: 40px;
+    .ut-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        aspect-ratio: 5 / 7;
+        padding: 0;
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: inherit;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: var(--shadow-medium);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    /* Brillo metálico diagonal, como el foil de las cartas */
+    .ut-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(118deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.08) 34%, rgba(255,255,255,0) 46%);
+        pointer-events: none;
+    }
+    .ut-card:hover, .ut-card:focus-visible {
+        transform: translateY(-4px) scale(1.03);
+        box-shadow: rgba(0, 0, 0, .55) 0 12px 26px;
+        outline: none;
+    }
+    .ut-bronce {
+        background: linear-gradient(163deg, #6d3d17 0%, #b57a41 32%, #f0c692 50%, #b57a41 68%, #5f3413 100%);
+        color: #3a2109;
+    }
+    .ut-plata {
+        background: linear-gradient(163deg, #575c68 0%, #a8aeb9 32%, #f0f3f7 50%, #a8aeb9 68%, #4e535e 100%);
+        color: #23262b;
+    }
+    .ut-oro {
+        background: linear-gradient(163deg, #7d5a10 0%, #cfa029 32%, #f9e79a 50%, #cfa029 68%, #6f4f0c 100%);
+        color: #3a2c05;
+    }
+    .ut-top {
+        display: flex;
+        flex-direction: column;
+        align-self: flex-start;
+        padding: 9px 0 0 11px;
+        line-height: 1;
+    }
+    .ut-rating {
+        font-size: 1.45rem;
+        font-weight: 900;
+        letter-spacing: -1px;
+        font-variant-numeric: tabular-nums;
+    }
+    .ut-tier {
+        margin-top: 3px;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1.6px;
+        opacity: .78;
+    }
+    .ut-face {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
-        background: var(--surface-2);
-        border-radius: 6px;
+        font-size: 2.4rem;
+        line-height: 1;
     }
-    .hist-row .info { flex: 1; min-width: 0; }
-    .hist-row .n { font-weight: 700; font-size: 0.98rem; }
-    .hist-row .s { font-style: italic; color: var(--subdued); font-size: 0.83rem; margin-top: 1px; }
-    .hist-row .conf-hist {
-        color: var(--subdued);
-        font-size: 0.78rem;
-        font-variant-numeric: tabular-nums;
-        margin-top: 2px;
-    }
-    .hist-row .hist-date {
-        color: var(--track);
-        font-size: 0.74rem;
-        font-variant-numeric: tabular-nums;
-        margin-top: 2px;
-    }
-    .hist-count {
-        flex: 0 0 auto;
-        font-variant-numeric: tabular-nums;
+    .ut-name {
+        width: 100%;
+        padding: 5px 6px 0;
+        border-top: 1px solid rgba(0, 0, 0, .22);
+        font-size: .66rem;
         font-weight: 900;
-        font-size: 1.05rem;
-        color: var(--green);
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        line-height: 1.15;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
     }
-    .hist-count span {
-        color: var(--subdued);
+    .ut-count {
+        padding: 3px 0 9px;
+        font-size: .6rem;
+        font-weight: 800;
+        letter-spacing: .5px;
+        opacity: .72;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Carta maximizada */
+    .card-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, .78);
+        backdrop-filter: blur(6px);
+    }
+    .card-modal[hidden] { display: none; }
+    .ut-card.ut-big {
+        width: min(320px, 86vw);
+        aspect-ratio: auto;
+        cursor: default;
+        box-shadow: rgba(0, 0, 0, .6) 0 20px 50px;
+    }
+    .ut-card.ut-big:hover { transform: none; }
+    .ut-big .ut-top { padding: 16px 0 0 20px; }
+    .ut-big .ut-rating { font-size: 2.7rem; }
+    .ut-big .ut-tier { font-size: 11px; margin-top: 5px; }
+    .ut-big .ut-face { font-size: 4.6rem; padding: 10px 0 16px; }
+    .ut-big .ut-name { font-size: 1.02rem; padding: 9px 14px 0; }
+    .ut-big .ut-sci {
+        font-size: .74rem;
+        font-style: italic;
+        font-weight: 600;
+        opacity: .75;
+        padding: 2px 14px 0;
+    }
+    .ut-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3px 18px;
+        width: 100%;
+        padding: 12px 22px 4px;
+    }
+    .ut-stat {
+        display: flex;
+        justify-content: space-between;
+        font-size: .82rem;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+    .ut-stat span { font-size: .72rem; letter-spacing: 1.2px; opacity: .72; }
+    .ut-meta {
+        width: 100%;
+        padding: 10px 22px 16px;
+        font-size: .68rem;
+        font-weight: 600;
+        line-height: 1.5;
+        opacity: .8;
+    }
+    .close-card {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        z-index: 1;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        font-family: inherit;
+        font-size: 18px;
         font-weight: 700;
-        font-size: 0.85rem;
-        margin-left: 2px;
+        line-height: 1;
+        color: inherit;
+        background: rgba(0, 0, 0, .16);
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
     }
-    .hist-row.noise .hist-count { color: var(--warn); }
+    .close-card:hover { background: rgba(0, 0, 0, .3); }
 
     footer {
         text-align: center;
@@ -357,11 +483,15 @@
 
     <section id="history" class="history-card" hidden>
         <div class="hist-head">
-            <h2 class="hist-title">Lo que has escuchado</h2>
+            <h2 class="hist-title">Tu colección</h2>
             <button id="clearHistory" class="clear-btn" type="button">Borrar</button>
         </div>
-        <div id="historyBody"></div>
+        <div id="historyBody" class="cards-grid"></div>
     </section>
+
+    <div id="cardModal" class="card-modal" role="dialog" aria-modal="true" aria-label="Carta ampliada" hidden>
+        <div id="cardModalBody"></div>
+    </div>
 
     <footer>
         Detección con el modelo <strong>BirdNET</strong> del
@@ -369,7 +499,7 @@
         Todo el procesamiento ocurre en tu navegador; el audio no se sube a ningún servidor.<br>
         El modelo se guarda en tu dispositivo: solo se descarga la primera vez.
         <!-- APP_VERSION: incrementar en cada push a main -->
-        <div class="version">v1.0.1</div>
+        <div class="version">v1.1.0</div>
     </footer>
 </div>
 
@@ -660,20 +790,112 @@ function addToHistory(items) {
     renderHistory();
 }
 
-// Confianza máxima guardada (0 si la entrada aún no tiene confianzas).
-function maxConf(v) {
-    return Array.isArray(v.confs) && v.confs.length ? Math.max(...v.confs) : 0;
+// ---- Cartas tipo Ultimate Team ----
+// La media de aciertos de cada especie es su "media" de carta, y esa media
+// decide la categoría base: hasta 64 bronce, 65-74 plata, 75 o más oro.
+const TIERS = [
+    { min: 75, key: 'oro',    label: 'Oro' },
+    { min: 65, key: 'plata',  label: 'Plata' },
+    { min: 0,  key: 'bronce', label: 'Bronce' },
+];
+const tierOf = rating => TIERS.find(t => rating >= t.min);
+
+// Estadísticas de la carta a partir de todas las confianzas guardadas.
+function cardStats(v) {
+    const pcts = (Array.isArray(v.confs) ? v.confs : []).map(c => c * 100);
+    const media = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+    const rating = Math.round(media);
+    // Regularidad: cuánto se parecen entre sí los aciertos (100 = siempre igual).
+    let reg = null;
+    if (pcts.length > 1 && media > 0) {
+        const varianza = pcts.reduce((a, b) => a + (b - media) ** 2, 0) / pcts.length;
+        reg = Math.max(1, Math.min(99, Math.round(100 - Math.sqrt(varianza) / media * 100)));
+    }
+    return {
+        rating,
+        // Las entradas guardadas antes de registrar confianzas no tienen media.
+        has: pcts.length > 0,
+        tier: tierOf(rating),
+        max: pcts.length ? Math.round(Math.max(...pcts)) : 0,
+        min: pcts.length ? Math.round(Math.min(...pcts)) : 0,
+        last: pcts.length ? Math.round(pcts[pcts.length - 1]) : 0,
+        reg,
+        count: v.count || 0,
+    };
 }
 
-// Resumen de las confianzas guardadas: última, media y máxima (en %).
-function confSummary(confs) {
-    if (!Array.isArray(confs) || !confs.length) return '';
-    const pct = c => (c * 100).toFixed(0);
-    const last = confs[confs.length - 1];
-    const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
-    const max = Math.max(...confs);
-    return `últ. ${pct(last)}% · med. ${pct(avg)}% · máx. ${pct(max)}%`;
+// Carta pequeña de la cuadrícula: solo media, categoría y nombre.
+function renderCard(key, v) {
+    const st = cardStats(v);
+    return `
+        <button class="ut-card ut-${st.tier.key}" type="button"
+                data-key="${escapeHtml(key)}"
+                aria-label="${escapeHtml(v.label)} · ${st.tier.label} ${st.has ? st.rating : ''}">
+            <div class="ut-top">
+                <div class="ut-rating">${st.has ? st.rating : '—'}</div>
+                <div class="ut-tier">${st.tier.label}</div>
+            </div>
+            <div class="ut-face">${v.emoji}</div>
+            <div class="ut-name">${escapeHtml(v.label)}</div>
+            <div class="ut-count">${st.count}×</div>
+        </button>`;
 }
+
+// Carta maximizada: la misma carta con todas sus estadísticas.
+function renderBigCard(key, v) {
+    const st = cardStats(v);
+    const n = x => st.has ? x : '—';
+    const stats = [
+        ['MED', n(st.rating)], ['MÁX', n(st.max)],
+        ['ÚLT', n(st.last)],   ['MÍN', n(st.min)],
+        ['REG', st.reg === null ? '—' : st.reg], ['VEC', st.count],
+    ];
+    const date = lastSeen(v);
+    return `
+        <div class="ut-card ut-big ut-${st.tier.key}">
+            <button id="closeCard" class="close-card" type="button" aria-label="Cerrar">×</button>
+            <div class="ut-top">
+                <div class="ut-rating">${n(st.rating)}</div>
+                <div class="ut-tier">${st.tier.label}</div>
+            </div>
+            <div class="ut-face">${v.emoji}</div>
+            <div class="ut-name">${escapeHtml(v.label)}</div>
+            ${v.sci ? `<div class="ut-sci">${escapeHtml(v.sci)}</div>` : ''}
+            <div class="ut-stats">
+                ${stats.map(([k, val]) => `<div class="ut-stat"><span>${k}</span>${val}</div>`).join('')}
+            </div>
+            <div class="ut-meta">
+                Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
+            </div>
+        </div>`;
+}
+
+const cardModal = el('cardModal');
+const cardModalBody = el('cardModalBody');
+
+function openCard(key) {
+    const v = loadHistory()[key];
+    if (!v) return;
+    cardModalBody.innerHTML = renderBigCard(key, v);
+    cardModal.hidden = false;
+    el('closeCard').focus();
+}
+function closeCard() {
+    cardModal.hidden = true;
+    cardModalBody.innerHTML = '';
+}
+
+historyBody.addEventListener('click', e => {
+    const card = e.target.closest('.ut-card');
+    if (card) openCard(card.dataset.key);
+});
+cardModal.addEventListener('click', e => {
+    // Cerrar al pulsar el fondo o la ✕; el resto de la carta no cierra.
+    if (e.target === cardModal || e.target.closest('#closeCard')) closeCard();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !cardModal.hidden) closeCard();
+});
 
 // Fecha de la última escucha. Las entradas antiguas no la tienen: devuelve ''.
 function lastSeen(v) {
@@ -687,34 +909,23 @@ function lastSeen(v) {
 
 function renderHistory() {
     const h = loadHistory();
-    // Los sonidos que no son aves (coche, voz humana…) van al final del ranking;
-    // dentro de cada grupo se ordena por la confianza máxima alcanzada.
+    // Los sonidos que no son aves (coche, voz humana…) van al final de la colección;
+    // dentro de cada grupo mandan las cartas de más media (oro antes que plata y bronce).
     const entries = Object.entries(h).sort((a, b) => {
         const birdDiff = (b[1].isBird ? 1 : 0) - (a[1].isBird ? 1 : 0);
         if (birdDiff) return birdDiff;
-        return maxConf(b[1]) - maxConf(a[1]);
+        const ratingDiff = cardStats(b[1]).rating - cardStats(a[1]).rating;
+        if (ratingDiff) return ratingDiff;
+        return (b[1].count || 0) - (a[1].count || 0);
     });
     if (!entries.length) { historySection.hidden = true; return; }
     historySection.hidden = false;
-    historyBody.innerHTML = entries.map(([, v]) => {
-        const conf = confSummary(v.confs);
-        const date = lastSeen(v);
-        return `
-        <div class="hist-row${v.isBird ? '' : ' noise'}">
-            <div class="hist-emoji">${v.emoji}</div>
-            <div class="info">
-                <div class="n">${escapeHtml(v.label)}</div>
-                ${v.sci ? `<div class="s">${escapeHtml(v.sci)}</div>` : ''}
-                ${conf ? `<div class="conf-hist">${conf}</div>` : ''}
-                ${date ? `<div class="hist-date">Última vez: ${escapeHtml(date)}</div>` : ''}
-            </div>
-            <div class="hist-count">${v.count}<span>×</span></div>
-        </div>`;
-    }).join('');
+    historyBody.innerHTML = entries.map(([key, v]) => renderCard(key, v)).join('');
 }
 
 clearHistoryBtn.addEventListener('click', () => {
     try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+    closeCard();
     renderHistory();
 });
 
