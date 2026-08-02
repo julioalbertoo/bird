@@ -68,8 +68,11 @@ como "No parece un pájaro" y lista aparte las posibles aves de fondo.
 Al final de la página se muestra **"Lo que has escuchado"**: un recuento de cada
 ave o sonido detectado y el número de veces, con un icono representativo (🐦
 para las aves y el emoji correspondiente para los sonidos no-ave: 🐕 perro, 🚗
-motor, 🗣️ voz…). La lista se ordena de más a menos frecuente.
+motor, 🗣️ voz…). La lista se ordena por la **confianza máxima** registrada, de
+mayor a menor.
 
+- Los **sonidos que no son aves** (motor, voz humana, ruido…) van siempre al
+  **final del ranking**, por debajo de todas las aves.
 - Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a
   ningún sitio y persiste entre visitas.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
@@ -77,6 +80,8 @@ motor, 🗣️ voz…). La lista se ordena de más a menos frecuente.
 - Además del recuento, se guardan **todas las confianzas** de cada especie (una
   por grabación en que aparece). Bajo cada entrada se muestra un resumen con la
   **última**, la **media** y la **máxima** confianza registradas.
+- También se muestra la **fecha de la última vez** que se escuchó. Las entradas
+  guardadas antes de esta versión no tienen fecha y no la muestran.
 - El botón **Borrar** vacía el historial.
 
 ## Versión

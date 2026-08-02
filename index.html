@@ -283,6 +283,12 @@
         font-variant-numeric: tabular-nums;
         margin-top: 2px;
     }
+    .hist-row .hist-date {
+        color: var(--track);
+        font-size: 0.74rem;
+        font-variant-numeric: tabular-nums;
+        margin-top: 2px;
+    }
     .hist-count {
         flex: 0 0 auto;
         font-variant-numeric: tabular-nums;
@@ -363,7 +369,7 @@
         Todo el procesamiento ocurre en tu navegador; el audio no se sube a ningún servidor.<br>
         El modelo se guarda en tu dispositivo: solo se descarga la primera vez.
         <!-- APP_VERSION: incrementar en cada push a main -->
-        <div class="version">v1.0.0</div>
+        <div class="version">v1.0.1</div>
     </footer>
 </div>
 
@@ -643,6 +649,7 @@ function addToHistory(items) {
         if (!Array.isArray(cur.confs)) cur.confs = [];   // migra entradas antiguas sin confianzas
         cur.count += 1;
         if (it.conf !== null) cur.confs.push(Math.round(it.conf * 10000) / 10000);
+        cur.lastAt = Date.now();          // fecha de la última vez que se escuchó
         cur.label = it.label;
         cur.emoji = it.emoji;
         cur.sci = it.sci;
@@ -651,6 +658,11 @@ function addToHistory(items) {
     }
     saveHistory(h);
     renderHistory();
+}
+
+// Confianza máxima guardada (0 si la entrada aún no tiene confianzas).
+function maxConf(v) {
+    return Array.isArray(v.confs) && v.confs.length ? Math.max(...v.confs) : 0;
 }
 
 // Resumen de las confianzas guardadas: última, media y máxima (en %).
@@ -663,13 +675,30 @@ function confSummary(confs) {
     return `últ. ${pct(last)}% · med. ${pct(avg)}% · máx. ${pct(max)}%`;
 }
 
+// Fecha de la última escucha. Las entradas antiguas no la tienen: devuelve ''.
+function lastSeen(v) {
+    if (!v.lastAt) return '';
+    const d = new Date(v.lastAt);
+    if (isNaN(d)) return '';
+    return d.toLocaleString('es-ES', {
+        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+}
+
 function renderHistory() {
     const h = loadHistory();
-    const entries = Object.entries(h).sort((a, b) => b[1].count - a[1].count);
+    // Los sonidos que no son aves (coche, voz humana…) van al final del ranking;
+    // dentro de cada grupo se ordena por la confianza máxima alcanzada.
+    const entries = Object.entries(h).sort((a, b) => {
+        const birdDiff = (b[1].isBird ? 1 : 0) - (a[1].isBird ? 1 : 0);
+        if (birdDiff) return birdDiff;
+        return maxConf(b[1]) - maxConf(a[1]);
+    });
     if (!entries.length) { historySection.hidden = true; return; }
     historySection.hidden = false;
     historyBody.innerHTML = entries.map(([, v]) => {
         const conf = confSummary(v.confs);
+        const date = lastSeen(v);
         return `
         <div class="hist-row${v.isBird ? '' : ' noise'}">
             <div class="hist-emoji">${v.emoji}</div>
@@ -677,6 +706,7 @@ function renderHistory() {
                 <div class="n">${escapeHtml(v.label)}</div>
                 ${v.sci ? `<div class="s">${escapeHtml(v.sci)}</div>` : ''}
                 ${conf ? `<div class="conf-hist">${conf}</div>` : ''}
+                ${date ? `<div class="hist-date">Última vez: ${escapeHtml(date)}</div>` : ''}
             </div>
             <div class="hist-count">${v.count}<span>×</span></div>
         </div>`;
