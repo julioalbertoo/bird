@@ -687,6 +687,94 @@ const NON_BIRD = {
 };
 const nonBird = item => NON_BIRD[item.sciName] || null;
 
+// Icono por grupo de especie. BirdNET conoce ~6.500 especies, así que en vez de
+// mapearlas una a una se busca la palabra del grupo en el nombre (español o
+// inglés) o en el género científico. Gana la primera regla que coincida, así que
+// el orden importa: lo específico va antes que lo general.
+const SPECIES_EMOJI = [
+    // Anfibios, insectos y mamíferos: BirdNET también los reconoce. Se buscan por
+    // género científico, que no se confunde con nombres de aves («Cricket Frog» es
+    // una rana, «Grasshopper Warbler» un ave).
+    ['🐸', /\b(acris|anaxyrus|dryophytes|eleutherodactylus|gastrophryne|hyliola|incilius|lithobates|pseudacris|rana|hyla|scaphiopus)\b/],
+    ['🦗', /\b(allonemobius|amblycorypha|conocephalus|eunemobius|gryllus|neoconocephalus|neonemobius|oecanthus|orchelimum|orocharis|pterophylla|scudderia|magicicada)\b/],
+    ['🐒', /\b(alouatta|ateles|cebus|saguinus)\b/],
+    ['🐺', /\bcanis\b/],
+    ['🦌', /\b(odocoileus|cervus|alces)\b/],
+    ['🐿️', /\b(sciurus|tamias|tamiasciurus|marmota)\b/],
+
+    // Aves: primero los nombres compuestos, que si no se los quedaría otro grupo
+    // («Antpitta» es hormiguero, no pita; «Owlet-nightjar» es chotacabras, no búho).
+    ['🐜', /\bant(bird|pitta|wren|shrike|vireo|thrush|-)|gnateater|hormiguer|batara|tororoi|tiluchi|chororo|ponchito|gralaria|jejenero|batarito|tovaca|formicario/],
+    ['🌙', /night(jar|hawk)|frogmouth|potoo|poorwill|whip-poor-will|oilbird|chotacabras|anapero|nictibio|podargo|guacharo|tapacaminos|atajacaminos|egotelo/],
+    ['🦉', /\bowls?\b|owlet|\bbuho|lechuza|carabo|autillo|mochuelo|tecolote/],
+    ['🦅', /eagle|hawk|falcon|kestrel|harrier|\bkites?\b|buzzard|osprey|vulture|condor|caracara|goshawk|sparrowhawk|\bmerlin\b|gyrfalcon|bateleur|aguila|halcon|cernicalo|aguilucho|milano|busardo|ratonero|buitre|gavilan|\bazor\b|elanio|zopilote|quebrantahuesos|alcotan|esmerejon|aguililla|\barpia\b/],
+    ['🦜', /parrot(?!bill)|parakeet|macaw|cockatoo|cockatiel|lorikeet|\blory\b|lovebird|conure|rosella|budgerigar|parrotlet|corella|kakapo|\bkea\b|caique|\bloros?\b|cotorra|guacamayo|cacatua|perico|papagayo|lorito|\bamazona\b|agapornis|periquito|aratinga|catita|inseparable|maracana|loriculo|cotorrita|\blori\b/],
+
+    // Los cantores van antes que el agua: la «Alondra Ibis» es una alondra.
+    ['🎵', /nightingale|\blarks?\b|mockingbird|thrush|solitaire|\bwrens?\b|stonechat|whinchat|bushchat|\bchats?\b|redstart|wheatear|\brobins?\b|ruisenor|alondra|terrera|cogujada|totovia|zorzal|sinsonte|calandria|cucarachero|chochin|ratona|saltapared|tarabilla|collalba|petirrojo|solitario|cosifa|zorzalito|roquero|\bmirlos?\b|petroica|ratina|candelita|alzacola/],
+
+    // Aves de agua, de la orilla al mar abierto.
+    ['🐧', /penguin|pinguino/],
+    ['🦢', /\bswans?\b|\bcisne/],
+    ['🪿', /\bgeese\b|\bgoose\b|\bbrant\b|\bbrent\b|\bganso|\bansar|barnacla/],
+    ['🦆', /\bducks?\b|\bteal\b|mallard|pintail|wigeon|pochard|shoveler|merganser|scoter|eider|goldeneye|garganey|shelduck|\bsmew\b|bufflehead|scaup|\bpatos?\b|cerceta|anade|porron|serreta|negron|\btarro\b|pijije|malvasia|cuchara/],
+    ['💧', /grebe|\bloons?\b|zampullin|somormujo|colimbo|achichilique|\bmacaes?\b/],
+    ['🌾', /\brails?\b|crake|\bcoots?\b|moorhen|gallinule|swamphen|rascon|polluela|\bfocha|gallineta|calamon|\bburrito\b|cotara/],
+    ['🦩', /flamingo|spoonbill|heron|egret|bittern|\bstork\b|\bcranes?\b|\bibis\b|jabiru|flamenco|espatula|garza|garcilla|garceta|\bciguena\b|grulla|avetoro|avetorillo|tantalo/],
+    ['🌊', /\bgulls?\b|\bterns?\b|albatross|petrel|shearwater|\bskua\b|jaeger|booby|gannet|cormorant|\bshag\b|pelican|frigatebird|\bauks?\b|puffin|\bmurres?\b|guillemot|noddy|tropicbird|kittiwake|gaviota|charran|fumarel|albatros|pardela|pagalo|piquero|alcatraz|cormoran|pelicano|rabihorcado|fragata|frailecillo|\barao\b|\balca\b|rabijunco|paino|tinosa/],
+    ['🏖️', /sandpiper|plover|\bsnipe\b|curlew|godwit|dunlin|\bstint\b|turnstone|oystercatcher|avocet|\bstilt\b|lapwing|phalarope|woodcock|redshank|greenshank|killdeer|whimbrel|sanderling|\bknot\b|\bruff\b|dowitcher|jacana|thick-knee|pratincole|correlimos|chorlito|chorlitejo|agachadiza|zarapito|\baguja\b|vuelvepiedras|ostrero|avoceta|ciguenuela|avefria|falaropo|\bchocha\b|archibebe|andarrios|playero|becasina|alcaravan/],
+
+    ['🕊️', /\bdoves?\b|pigeon|\bpaloma|tortola|\bzurita\b|columbina|vinago|ducula|tilopo|palomit|tortolit/],
+    ['🦚', /peafowl|peacock|pavo real|espolonero/],
+    ['🦃', /\bturkey\b|\bpavo\b|guajolote/],
+    ['🐔', /pheasant|partridge|quail|grouse|ptarmigan|capercaillie|monal|tragopan|bobwhite|snowcock|faisan|perdiz|codorniz|urogallo|lagopodo|\bcolin\b|arborofila|corcovado/],
+    ['🐓', /junglefowl|chicken|rooster|spurfowl|francolin|guineafowl|curassow|chachalaca|\bguans?\b|\bgallos?\b|\bgallinas?\b|pintada|\bpavon\b|\bpauji\b|\bpavas?\b|guacharaca/],
+    ['🦤', /ostrich|\bemu\b|\brhea\b|cassowary|\bkiwi\b|tinamou|nothura|\bmoa\b|avestruz|nandu|casuario|tinamu|\bmacuco\b|inambu/],
+
+    ['🐦‍⬛', /\bcrows?\b|\braven\b|\brook\b|jackdaw|magpie|\bjays?\b|chough|nutcracker|treepie|blackbird|starling|grackle|cowbird|\bmyna\b|drongo|cuervo|corneja|grajilla|urraca|arrendajo|\bchova\b|cascanueces|rabilargo|estornino|zanate|\btordo\b|\bmina\b|quiscal|\bcharlatan\b|\bchara\b|varillero/],
+    ['🪵', /woodpecker|sapsucker|flicker|piculet|wryneck|flameback|woodcreeper|carpintero|carpinterito|\bpitos?\b|torcecuello|trepatroncos|\bpicos?\b|picamaderos/],
+    // Furnáridos: los arquitectos, del horno de barro al nido de espinas.
+    ['🪺', /spinetail|canastero|foliage-gleaner|treehunter|earthcreeper|leaftosser|\bxenops\b|thornbird|hornero|ovenbird|\bpijui\b|ticotico|colaespina|bandurrita|tijeral|curutie|espinero|picolezna|trepamusgos|tirahojas/],
+    ['🌺', /hummingbird|sunbird|honeyeater|spiderhunter|flowerpecker|sunangel|coquette|\bsylph\b|woodstar|sabrewing|colibri|ermitano|zumbador|amazilia|suimanga|mielero|pinchaflor|picaflor|coqueta|zafiro|silfo|picoespina/],
+    ['🐟', /kingfisher|kookaburra|martin pescador|martin cazador|\balcion|cucaburra/],
+    ['🐝', /bee-eater|abejaruco/],
+    ['🪽', /\bswifts?\b|swallow|\bmartins?\b|swiftlet|needletail|vencejo|golondrina|\bavion\b|salangana|artamo/],
+    ['⏰', /cuckoo(?!shrike)|\bkoel\b|coucal|malkoha|\banis?\b|roadrunner|\bcucos?\b|\bcucal|cuclillo|garrapatero|correcaminos|crespin|\bcrialo|malcoha/],
+    ['🌈', /trogon|quetzal|motmot|\brollers?\b|\bpittas?\b|broadbill|turaco|fairy-bluebird|momoto|carraca|surucua|\bpita\b|eurilaimo|\birena\b/],
+    ['🥭', /toucan|aracari|\bhornbill|barbet|\bcalao\b|tucan|arasari|barbudo|\btorito\b|cabezon|\btoco\b/],
+    ['👑', /hoopoe|abubilla/],
+    ['🍯', /honeyguide|\bindicador/],
+    ['👓', /white-eyes?\b|silvereye|anteojitos/],
+    ['🪹', /weaver|bishop|widowbird|oropendola|cacique|\borioles?\b|malimbe|tejedor|obispo|\bviuda\b|turpial|bolsero|\bwhydah\b|bufalero/],
+    ['🪰', /flycatcher|\btyrants?\b|tyrannulet|elaenia|\bpewee\b|kingbird|phoebe|becard|\bmonarchs?\b|fantail|papamoscas|mosquero|mosquerito|mosqueta|\btirano|elenia|titiriji|monarca|viudita|birro|\bfibi|orejerito|abanico|copeton|bienteveo|piojito|\bpibi|cachudito|fiofio|tiranuelo|atrapamoscas/],
+    // Tras los tiranos, para no quedarse con el «Shrike-Tyrant».
+    ['🗡️', /\bshrikes?\b|bushshrike|boubou|gonolek|alcaudon|verdugo|\bbubu/],
+    ['🥜', /\btits?\b|chickadee|titmouse|carbonero|herrerillo|\bmito\b|moscon/],
+    ['🌳', /nuthatch|treecreeper|\bcreepers?\b|trepador|agateador|corretroncos/],
+    ['🍃', /warbler|prinia|cisticola|apalis|tailorbird|gerygone|chiffchaff|whitethroat|blackcap|yellowthroat|\bvireos?\b|greenlet|gnatcatcher|mosquitero|curruca|reinita|buscarla|carricero|zarcero|sastrecillo|perlita|verdillo|\bchivi|mascarita|gerigon|zarzalero|\bcetia|carricerin/],
+    ['🎨', /tanager|euphonia|chlorophonia|dacnis|honeycreeper|tangara|eufonia|clorofonia|\bsaira\b|frutero|piranga/],
+    ['🐤', /\bfinch|canary|siskin|goldfinch|crossbill|grosbeak|bunting|longspur|redpoll|greenfinch|serin|linnet|\bsparrows?\b|towhee|\bjuncos?\b|seedeater|grassquit|waxbill|jilguero|canario|lugano|verderon|pinzon|piquituerto|picogordo|escribano|semillero|camachuelo|verdecillo|pardillo|gorrion|chingolo|cerquero|espiguero|corbatita|\byal\b|estrilda|bengali|carden|brushfinch|atlapetes|saltator|saltador|picogrueso|\btoqui|chirigue|monterita/],
+    ['🪶', /bird-of-paradise|riflebird|manucode|manakin|cotinga|bellbird|umbrellabird|fruitcrow|ave del paraiso|saltarin|campanero|paraiso|anambe/],
+];
+const DEFAULT_EMOJI = '🐦';
+
+// Sin tildes ni mayúsculas, para que las reglas se escriban en llano.
+const plano = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Icono de una especie a partir de sus nombres. Si no cae en ningún grupo,
+// se queda con el pájaro genérico.
+function speciesEmoji(es, en, sci) {
+    const t = plano(`${es} ${en} ${sci}`);
+    for (const [emoji, re] of SPECIES_EMOJI) if (re.test(t)) return emoji;
+    return DEFAULT_EMOJI;
+}
+
+// Icono de una detección: los sonidos que no son aves tienen el suyo propio.
+function itemEmoji(x) {
+    const nb = nonBird(x);
+    return nb ? nb.emoji : speciesEmoji(x.name, x.enName, x.sciName);
+}
+
 function renderResults(list) {
     results.style.display = 'block';
     if (!list.length) {
@@ -727,7 +815,7 @@ function renderResults(list) {
     html = `
         <div class="top">
             <p class="lead">Coincidencia principal</p>
-            <p class="name">${escapeHtml(cap(top.name || top.enName || top.sciName))}</p>
+            <p class="name">${itemEmoji(top)} ${escapeHtml(cap(top.name || top.enName || top.sciName))}</p>
             <p class="sci">${escapeHtml(top.sciName)}${top.enName ? ' · ' + escapeHtml(top.enName) : ''}</p>
             <div class="row">
                 <div class="meter"><span style="width:${pct(top.confidence)}%"></span></div>
@@ -762,7 +850,7 @@ function renderRow(b, pct, idx) {
         <div class="row">
             <div class="idx">${idx}</div>
             <div class="info">
-                <div class="n">${escapeHtml(cap(b.name || b.enName || b.sciName))}</div>
+                <div class="n">${itemEmoji(b)} ${escapeHtml(cap(b.name || b.enName || b.sciName))}</div>
                 <div class="s">${escapeHtml(b.sciName)}</div>
             </div>
             <div class="meter"><span style="width:${pct(b.confidence)}%"></span></div>
@@ -789,7 +877,7 @@ function toHistItem(x) {
     const conf = typeof x.confidence === 'number' ? x.confidence : null;
     const nb = nonBird(x);
     if (nb) return { key: x.sciName, label: nb.es, emoji: nb.emoji, sci: '', isBird: false, conf };
-    return { key: x.sciName, label: cap(x.name || x.enName || x.sciName), emoji: '🐦', sci: x.sciName, isBird: true, conf };
+    return { key: x.sciName, label: cap(x.name || x.enName || x.sciName), emoji: itemEmoji(x), sci: x.sciName, isBird: true, conf };
 }
 
 // Suma +1 por cada especie/sonido mostrado (una vez por grabación) y guarda
@@ -869,6 +957,14 @@ function cardStats(v) {
     };
 }
 
+// Icono de la carta. Las entradas guardadas antes de que hubiera un icono por
+// grupo llevan el pájaro genérico: se recalcula al dibujarlas, con el nombre en
+// español y el científico, que es lo que quedó guardado.
+function cardEmoji(v) {
+    if (!v.isBird) return v.emoji || '🔊';
+    return v.emoji && v.emoji !== DEFAULT_EMOJI ? v.emoji : speciesEmoji(v.label, '', v.sci);
+}
+
 // Carta pequeña de la cuadrícula: solo valoración y nombre; la categoría ya se
 // ve en el color de la carta, así que no se repite escrita.
 function renderCard(key, v) {
@@ -880,7 +976,7 @@ function renderCard(key, v) {
             <div class="ut-top">
                 <div class="ut-rating">${st.has ? st.rating : '—'}</div>
             </div>
-            <div class="ut-face">${v.emoji}</div>
+            <div class="ut-face">${cardEmoji(v)}</div>
             <div class="ut-name">${escapeHtml(v.label)}</div>
             <div class="ut-count">${st.count}×</div>
         </button>`;
@@ -903,7 +999,7 @@ function renderBigCard(key, v) {
                 <div class="ut-rating">${n(st.rating)}</div>
                 <div class="ut-tier">${st.tier.label}</div>
             </div>
-            <div class="ut-face">${v.emoji}</div>
+            <div class="ut-face">${cardEmoji(v)}</div>
             <div class="ut-name">${escapeHtml(v.label)}</div>
             ${v.sci ? `<div class="ut-sci">${escapeHtml(v.sci)}</div>` : ''}
             <div class="ut-stats">

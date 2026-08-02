@@ -91,7 +91,8 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
   esa grabación. Se cierra con la ✕, con Escape o pulsando fuera.
 - Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro), y los
   **sonidos que no son aves** (motor, voz humana, ruido…) van siempre al final.
-  Cada uno lleva su emoji: 🐦 aves, 🐕 perro, 🚗 motor, 🗣️ voz…
+- Cada especie luce el **icono de su grupo** (ver abajo), y los sonidos que no son
+  aves el suyo: 🐕 perro, 🚗 motor, 🗣️ voz…
 - Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a
   ningún sitio y persiste entre visitas.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
@@ -100,6 +101,43 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
   su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas. Lo
   mismo con la fecha y el sitio del `MÁX`: no se muestran hasta que batas esa
   marca con una escucha nueva.
+
+## Los iconos: uno por grupo de especie
+
+Ninguna carta se queda ya con el pájaro genérico si se puede afinar más. BirdNET
+conoce ~6.500 especies, así que en vez de mapearlas una a una la app busca la
+palabra del grupo en el nombre (español o inglés) o en el género científico, y le
+asigna su icono. Son **50 iconos distintos** y cubren el 85 % de las especies;
+el resto se queda con 🐦. El icono sale tanto en los resultados de cada escucha
+como en las cartas de la colección.
+
+| Icono | Grupo | Icono | Grupo |
+| --- | --- | --- | --- |
+| 🦅 | rapaces | 🦉 | búhos y lechuzas |
+| 🌙 | chotacabras y nictibios | 🦜 | loros y cotorras |
+| 🎵 | zorzales, alondras, currucas de canto | 🍃 | mosquiteros, reinitas, vireos |
+| 🪰 | papamoscas y tiranos | 🐜 | hormigueros y batarás |
+| 🐤 | pinzones, gorriones, semilleros | 🎨 | tangaras y eufonias |
+| 🪵 | pájaros carpinteros | 🪺 | horneros, pijuíes, ticoticos |
+| 🌺 | colibríes, suimangas, mieleros | 🐦‍⬛ | cuervos, urracas, estorninos |
+| 🕊️ | palomas y tórtolas | 🪽 | vencejos y golondrinas |
+| 🦆 🪿 🦢 | patos, gansos, cisnes | 💧 | zampullines y colimbos |
+| 🦩 | garzas, cigüeñas, grullas | 🌾 | rascones y fochas |
+| 🌊 | gaviotas y aves marinas | 🏖️ | limícolas de orilla |
+| 🐔 🐓 🦃 🦚 | gallináceas | 🦤 | avestruces y tinamúes |
+| ⏰ | cucos | 🌈 | trogones, pitas, carracas |
+| 🥭 | tucanes, cálaos, barbudos | 🐟 | martines pescadores |
+| 🐝 | abejarucos | 🍯 | indicadores |
+| 👓 | anteojitos | 🪹 | tejedores y oropéndolas |
+| 🗡️ | alcaudones | 🥜 | carboneros y herrerillos |
+| 🌳 | trepadores y agateadores | 👑 | abubillas |
+| 🪶 | aves del paraíso, cotingas | 🐧 | pingüinos |
+| 🐸 🦗 | ranas, grillos, chicharras | 🐿️ 🐒 🐺 🦌 | mamíferos |
+
+Las reglas viven en `SPECIES_EMOJI` (`index.html`) y se prueban en orden, así que
+lo específico va antes que lo general: un «Antpitta» es hormiguero y no pita, y un
+«Owlet-nightjar» es chotacabras y no búho. Las cartas guardadas antes de que
+existieran los iconos por grupo se recalculan al dibujarlas.
 
 ## Versión
 
