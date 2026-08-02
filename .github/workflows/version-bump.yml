@@ -1,0 +1,48 @@
+name: Sube la versión
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # El propio commit del bump vuelve a disparar el workflow: lo cortamos aquí.
+    if: "!contains(github.event.head_commit.message, '[skip version]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Incrementa el parche en index.html
+        id: bump
+        run: |
+          set -euo pipefail
+          actual=$(sed -n 's/.*<div class="version">v\([0-9]\+\.[0-9]\+\.[0-9]\+\)<\/div>.*/\1/p' index.html | head -1)
+          if [ -z "$actual" ]; then
+            echo "No se encontró la versión en index.html" >&2
+            exit 1
+          fi
+          IFS=. read -r mayor menor parche <<< "$actual"
+          nueva="$mayor.$menor.$((parche + 1))"
+          sed -i "s|<div class=\"version\">v$actual</div>|<div class=\"version\">v$nueva</div>|" index.html
+          echo "anterior=$actual" >> "$GITHUB_OUTPUT"
+          echo "nueva=$nueva" >> "$GITHUB_OUTPUT"
+
+      - name: Publica el commit de versión
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "v${{ steps.bump.outputs.nueva }} [skip version]"
+          git pull --rebase origin main
+          git push origin HEAD:main

@@ -109,6 +109,12 @@ número incremental que sube en cada push a `main`: el dígito de parche aumenta
 en uno por publicación (`v1.0.0` → `v1.0.1` → …). La constante vive en el
 `<div class="version">` de `index.html`, junto al comentario `APP_VERSION`.
 
+No hay que tocarla a mano: el workflow `.github/workflows/version-bump.yml` se
+dispara con cada push a `main`, incrementa el parche y publica un commit
+`vX.Y.Z [skip version]`. Ese sufijo evita que el propio commit vuelva a
+disparar el bump. Para saltarte el incremento en un push concreto, incluye
+`[skip version]` en el mensaje del commit.
+
 ## Despliegue
 
 Es una web estática; funciona tal cual en GitHub Pages (usa rutas relativas,
