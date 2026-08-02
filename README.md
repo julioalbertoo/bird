@@ -22,7 +22,9 @@ python3 -m http.server 8000
 3. Verás la especie más probable y hasta 4 alternativas con su confianza.
 
 Opcionalmente puedes permitir la geolocalización: BirdNET la usa para priorizar
-las especies probables en tu zona y época del año.
+las especies probables en tu zona y época del año, y la app anota dónde
+conseguiste el mejor acierto de cada especie. Las coordenadas se guardan solo en
+tu dispositivo, igual que el resto de la colección.
 
 ## ¿Con qué confianza se considera un acierto?
 
@@ -84,7 +86,9 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
   La carta ampliada añade el nombre científico, la categoría escrita y sus
   estadísticas: `MÁX` mejor acierto (la valoración), `MED` media, `MÍN` peor,
   `ÚLT` último, `REG` regularidad (100 = siempre acierta parecido) y `VEC` veces
-  escuchada. Se cierra con la ✕, con Escape o pulsando fuera.
+  escuchada. Debajo indica **cuándo y dónde se logró el `MÁX`** (fecha y
+  coordenadas); la ubicación solo aparece si diste permiso de geolocalización en
+  esa grabación. Se cierra con la ✕, con Escape o pulsando fuera.
 - Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro), y los
   **sonidos que no son aves** (motor, voz humana, ruido…) van siempre al final.
   Cada uno lleva su emoji: 🐦 aves, 🐕 perro, 🚗 motor, 🗣️ voz…
@@ -93,7 +97,9 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
   veces en la misma grabación solo cuenta una vez.
 - Las entradas guardadas antes de que se registraran confianzas no tienen datos:
-  su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas.
+  su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas. Lo
+  mismo con la fecha y el sitio del `MÁX`: no se muestran hasta que batas esa
+  marca con una escucha nueva.
 - El botón **Borrar** vacía la colección.
 
 ## Versión

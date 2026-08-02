@@ -429,6 +429,14 @@
         line-height: 1.5;
         opacity: .8;
     }
+    /* Dónde y cuándo se logró el máximo: una línea aparte, algo más discreta. */
+    .ut-best {
+        margin-top: 3px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(0, 0, 0, .16);
+        font-variant-numeric: tabular-nums;
+        opacity: .85;
+    }
     .close-card {
         position: absolute;
         top: 6px;
@@ -596,13 +604,23 @@ function loadBirdNet() {
 }
 
 // ---- Optional geolocation to refine which species are likely ----
-async function applyGeolocation(call) {
-    if (!navigator.geolocation) return;
+// Última ubicación conocida; también sirve para anotar dónde se oyó cada ave.
+let lastPos = null;
+
+async function getPosition(opts) {
+    if (!navigator.geolocation) return null;
     try {
         const pos = await new Promise((res, rej) =>
-            navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: false, timeout: 6000 }));
-        await call({ message: 'area-scores', latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+            navigator.geolocation.getCurrentPosition(res, rej,
+                { enableHighAccuracy: false, timeout: 6000, ...opts }));
+        lastPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
     } catch (_) { /* location denied / unavailable — continue without geo filtering */ }
+    return lastPos;
+}
+
+async function applyGeolocation(call) {
+    const pos = await getPosition();
+    if (pos) await call({ message: 'area-scores', latitude: pos.lat, longitude: pos.lon });
 }
 
 // ---- Record N ms of microphone audio and return 48 kHz mono Float32 PCM ----
@@ -794,11 +812,20 @@ function addToHistory(items) {
         const it = toHistItem(x);
         if (seen.has(it.key)) continue;   // no contar dos veces en la misma grabación
         seen.add(it.key);
+        const now = Date.now();
         const cur = h[it.key] || { count: 0, confs: [] };
         if (!Array.isArray(cur.confs)) cur.confs = [];   // migra entradas antiguas sin confianzas
         cur.count += 1;
-        if (it.conf !== null) cur.confs.push(Math.round(it.conf * 10000) / 10000);
-        cur.lastAt = Date.now();          // fecha de la última vez que se escuchó
+        if (it.conf !== null) {
+            const conf = Math.round(it.conf * 10000) / 10000;
+            cur.confs.push(conf);
+            // Cuándo y dónde se consiguió el mejor acierto: es lo que luce la carta.
+            if (!cur.best || conf > cur.best.conf) {
+                cur.best = { conf, at: now };
+                if (lastPos) { cur.best.lat = lastPos.lat; cur.best.lon = lastPos.lon; }
+            }
+        }
+        cur.lastAt = now;                 // fecha de la última vez que se escuchó
         cur.label = it.label;
         cur.emoji = it.emoji;
         cur.sci = it.sci;
@@ -831,6 +858,9 @@ function cardStats(v) {
         const varianza = pcts.reduce((a, b) => a + (b - media) ** 2, 0) / pcts.length;
         reg = Math.max(1, Math.min(99, Math.round(100 - Math.sqrt(varianza) / media * 100)));
     }
+    // Cuándo y dónde se logró el máximo. Solo se da por bueno si esa marca sigue
+    // siendo la mejor: las entradas antiguas guardaron confianzas sin anotarlo.
+    const best = v.best && Math.round(v.best.conf * 100) === rating ? v.best : null;
     return {
         rating,
         // Las entradas guardadas antes de registrar confianzas no tienen datos.
@@ -841,6 +871,8 @@ function cardStats(v) {
         last: pcts.length ? Math.round(pcts[pcts.length - 1]) : 0,
         reg,
         count: v.count || 0,
+        bestAt: best ? fmtDate(best.at) : '',
+        bestLoc: best && typeof best.lat === 'number' ? fmtLoc(best.lat, best.lon) : '',
     };
 }
 
@@ -886,6 +918,7 @@ function renderBigCard(key, v) {
             </div>
             <div class="ut-meta">
                 Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
+                ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${escapeHtml(st.bestLoc)}` : ''}</div>` : ''}
             </div>
         </div>`;
 }
@@ -917,15 +950,25 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !cardModal.hidden) closeCard();
 });
 
-// Fecha de la última escucha. Las entradas antiguas no la tienen: devuelve ''.
-function lastSeen(v) {
-    if (!v.lastAt) return '';
-    const d = new Date(v.lastAt);
+// Fecha legible. Las entradas antiguas no la tienen: devuelve ''.
+function fmtDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
     if (isNaN(d)) return '';
     return d.toLocaleString('es-ES', {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 }
+
+// Coordenadas en grados con hemisferio, que es lo que cabe en la carta.
+function fmtLoc(lat, lon) {
+    const deg = (v, pos, neg) =>
+        `${Math.abs(v).toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}° ${v >= 0 ? pos : neg}`;
+    return `${deg(lat, 'N', 'S')}, ${deg(lon, 'E', 'O')}`;
+}
+
+// Fecha de la última escucha.
+function lastSeen(v) { return fmtDate(v.lastAt); }
 
 function renderHistory() {
     const h = loadHistory();
@@ -968,7 +1011,11 @@ async function run() {
         setStatus('Escuchando el audio con BirdNET…');
         setBar(0);
         showBar(true);
+        // Se refresca la ubicación mientras se analiza, para anotar dónde se grabó.
+        // Vale una posición de hace unos minutos: no hace falta molestar al GPS.
+        const pos = getPosition({ maximumAge: 5 * 60 * 1000, timeout: 4000 });
         const list = await identify(pcm);
+        await pos;
         renderResults(list);
         setStatus('Listo. Pulsa para grabar de nuevo.');
     } catch (e) {
