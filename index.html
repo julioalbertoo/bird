@@ -422,6 +422,13 @@
         font-variant-numeric: tabular-nums;
         opacity: .85;
     }
+    /* El enlace a Google Maps mantiene el color de la carta y solo se subraya. */
+    .ut-mapa {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .ut-mapa:hover { opacity: .75; }
     .close-card {
         position: absolute;
         top: 6px;
@@ -856,6 +863,9 @@ function cardStats(v) {
         count: v.count || 0,
         bestAt: best ? fmtDate(best.at) : '',
         bestLoc: best && typeof best.lat === 'number' ? fmtLoc(best.lat, best.lon) : '',
+        // Coordenadas en crudo para poder enlazar el sitio en Google Maps.
+        bestLat: best && typeof best.lat === 'number' ? best.lat : null,
+        bestLon: best && typeof best.lat === 'number' ? best.lon : null,
     };
 }
 
@@ -901,7 +911,7 @@ function renderBigCard(key, v) {
             </div>
             <div class="ut-meta">
                 Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
-                ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${escapeHtml(st.bestLoc)}` : ''}</div>` : ''}
+                ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${mapsLink(st.bestLat, st.bestLon, st.bestLoc)}` : ''}</div>` : ''}
             </div>
         </div>`;
 }
@@ -948,6 +958,14 @@ function fmtLoc(lat, lon) {
     const deg = (v, pos, neg) =>
         `${Math.abs(v).toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}° ${v >= 0 ? pos : neg}`;
     return `${deg(lat, 'N', 'S')}, ${deg(lon, 'E', 'O')}`;
+}
+
+// La ubicación de la carta maximizada abre ese punto en Google Maps.
+function mapsLink(lat, lon, texto) {
+    const q = `${lat},${lon}`;
+    return `<a class="ut-mapa" href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(q)}"
+               target="_blank" rel="noopener noreferrer"
+               title="Ver en Google Maps">${escapeHtml(texto)}</a>`;
 }
 
 // Fecha de la última escucha.
