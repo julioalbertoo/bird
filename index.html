@@ -317,9 +317,11 @@
         letter-spacing: -1px;
         font-variant-numeric: tabular-nums;
     }
+    /* La categoría escrita solo aparece en la carta maximizada: en las
+       miniaturas basta con el color de la carta. */
     .ut-tier {
-        margin-top: 3px;
-        font-size: 8px;
+        margin-top: 5px;
+        font-size: 11px;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 1.6px;
@@ -388,7 +390,6 @@
     .ut-card.ut-big:hover { transform: none; }
     .ut-big .ut-top { padding: 16px 0 0 20px; }
     .ut-big .ut-rating { font-size: 2.7rem; }
-    .ut-big .ut-tier { font-size: 11px; margin-top: 5px; }
     .ut-big .ut-face { font-size: 4.6rem; padding: 10px 0 16px; }
     /* La carta grande crece según su contenido: ni reserva ni recorta líneas. */
     .ut-big .ut-name {
@@ -809,8 +810,8 @@ function addToHistory(items) {
 }
 
 // ---- Cartas tipo Ultimate Team ----
-// La media de aciertos de cada especie es su "media" de carta, y esa media
-// decide la categoría base: hasta 64 bronce, 65-74 plata, 75 o más oro.
+// El mejor acierto de cada especie es la valoración de su carta, y esa
+// valoración decide la categoría: hasta 64 bronce, 65-74 plata, 75 o más oro.
 const TIERS = [
     { min: 75, key: 'oro',    label: 'Oro' },
     { min: 65, key: 'plata',  label: 'Plata' },
@@ -822,7 +823,8 @@ const tierOf = rating => TIERS.find(t => rating >= t.min);
 function cardStats(v) {
     const pcts = (Array.isArray(v.confs) ? v.confs : []).map(c => c * 100);
     const media = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
-    const rating = Math.round(media);
+    // La valoración de la carta es el mejor acierto conseguido, no la media.
+    const rating = pcts.length ? Math.round(Math.max(...pcts)) : 0;
     // Regularidad: cuánto se parecen entre sí los aciertos (100 = siempre igual).
     let reg = null;
     if (pcts.length > 1 && media > 0) {
@@ -831,10 +833,10 @@ function cardStats(v) {
     }
     return {
         rating,
-        // Las entradas guardadas antes de registrar confianzas no tienen media.
+        // Las entradas guardadas antes de registrar confianzas no tienen datos.
         has: pcts.length > 0,
         tier: tierOf(rating),
-        max: pcts.length ? Math.round(Math.max(...pcts)) : 0,
+        media: Math.round(media),
         min: pcts.length ? Math.round(Math.min(...pcts)) : 0,
         last: pcts.length ? Math.round(pcts[pcts.length - 1]) : 0,
         reg,
@@ -842,7 +844,8 @@ function cardStats(v) {
     };
 }
 
-// Carta pequeña de la cuadrícula: solo media, categoría y nombre.
+// Carta pequeña de la cuadrícula: solo valoración y nombre; la categoría ya se
+// ve en el color de la carta, así que no se repite escrita.
 function renderCard(key, v) {
     const st = cardStats(v);
     return `
@@ -851,7 +854,6 @@ function renderCard(key, v) {
                 aria-label="${escapeHtml(v.label)} · ${st.tier.label} ${st.has ? st.rating : ''}">
             <div class="ut-top">
                 <div class="ut-rating">${st.has ? st.rating : '—'}</div>
-                <div class="ut-tier">${st.tier.label}</div>
             </div>
             <div class="ut-face">${v.emoji}</div>
             <div class="ut-name">${escapeHtml(v.label)}</div>
@@ -864,7 +866,7 @@ function renderBigCard(key, v) {
     const st = cardStats(v);
     const n = x => st.has ? x : '—';
     const stats = [
-        ['MED', n(st.rating)], ['MÁX', n(st.max)],
+        ['MÁX', n(st.rating)], ['MED', n(st.media)],
         ['ÚLT', n(st.last)],   ['MÍN', n(st.min)],
         ['REG', st.reg === null ? '—' : st.reg], ['VEC', st.count],
     ];
@@ -928,7 +930,7 @@ function lastSeen(v) {
 function renderHistory() {
     const h = loadHistory();
     // Los sonidos que no son aves (coche, voz humana…) van al final de la colección;
-    // dentro de cada grupo mandan las cartas de más media (oro antes que plata y bronce).
+    // dentro de cada grupo mandan las cartas de más valoración (oro antes que plata y bronce).
     const entries = Object.entries(h).sort((a, b) => {
         const birdDiff = (b[1].isBird ? 1 : 0) - (a[1].isBird ? 1 : 0);
         if (birdDiff) return birdDiff;

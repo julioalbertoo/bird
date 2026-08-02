@@ -68,30 +68,31 @@ como "No parece un pájaro" y lista aparte las posibles aves de fondo.
 Al final de la página se muestra **"Tu colección"**: cada ave o sonido escuchado
 es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
 
-**La media de la carta** es la media de todas las confianzas registradas para esa
-especie (en %), y esa media decide su **categoría base**:
+**La valoración de la carta** es el **mejor acierto** registrado para esa especie
+(la confianza máxima, en %), y esa valoración decide su **categoría base**:
 
-| Categoría | Media |
+| Categoría | Valoración |
 | --- | --- |
 | 🥉 **Bronce** | hasta 64 |
 | 🥈 **Plata** | de 65 a 74 |
 | 🥇 **Oro** | 75 o más |
 
 - Cada especie tiene **una sola carta**, la de **mayor categoría** alcanzada: la
-  cuadrícula muestra la media y la categoría, sin más cifras.
+  cuadrícula muestra solo la valoración y el nombre; la categoría ya se ve en el
+  color de la carta, así que no se escribe.
 - **Pulsa una carta para maximizarla** (o navega con el tabulador y pulsa Enter).
-  La carta ampliada añade el nombre científico y sus estadísticas: `MED` media,
-  `MÁX` mejor acierto, `MÍN` peor, `ÚLT` último, `REG` regularidad (100 = siempre
-  acierta parecido) y `VEC` veces escuchada. Se cierra con la ✕, con Escape o
-  pulsando fuera.
-- Las cartas se ordenan por **media, de mayor a menor** (primero el oro), y los
+  La carta ampliada añade el nombre científico, la categoría escrita y sus
+  estadísticas: `MÁX` mejor acierto (la valoración), `MED` media, `MÍN` peor,
+  `ÚLT` último, `REG` regularidad (100 = siempre acierta parecido) y `VEC` veces
+  escuchada. Se cierra con la ✕, con Escape o pulsando fuera.
+- Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro), y los
   **sonidos que no son aves** (motor, voz humana, ruido…) van siempre al final.
   Cada uno lleva su emoji: 🐦 aves, 🐕 perro, 🚗 motor, 🗣️ voz…
 - Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a
   ningún sitio y persiste entre visitas.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
   veces en la misma grabación solo cuenta una vez.
-- Las entradas guardadas antes de que se registraran confianzas no tienen media:
+- Las entradas guardadas antes de que se registraran confianzas no tienen datos:
   su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas.
 - El botón **Borrar** vacía la colección.
 
