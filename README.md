@@ -65,12 +65,30 @@ un mismo audio puede devolver varias aves distintas. El flujo (`index.html`) es:
    confianza más alta** de cualquier ventana. Así una ave que solo canta en un
    tramo no se penaliza por los tramos en que calla.
 3. La lista se ordena de mayor a menor confianza.
-4. Se muestra la **coincidencia principal** (la más alta) y hasta **4
-   alternativas** debajo.
+4. Se muestran hasta **5 cartas**: la primera es la **coincidencia principal**
+   (la más alta) y detrás van las alternativas.
 
 BirdNET también reconoce sonidos que no son de aves (perro, motor, voz humana,
-sirena…). Si el resultado más probable es uno de esos, la interfaz lo señala
-como "No parece un pájaro" y lista aparte las posibles aves de fondo.
+sirena…). Si el resultado más probable es uno de esos, la interfaz lo avisa
+antes de las cartas ("lo que más suena no parece un pájaro") y detrás enseña las
+posibles aves de fondo.
+
+### Revelado tipo sobre
+
+Lo que se acaba de escuchar sale como **cartas**, iguales que las de la
+colección, y se revelan **una a una**, como al abrir un sobre en FUT: cada carta
+gira sobre sí misma, estalla un destello del color de su categoría y un brillo
+la recorre al aterrizar. Las de **oro** son el premio gordo: destellan más fuerte
+y se quedan un rato con el halo dorado.
+
+- La **valoración** de estas cartas es el acierto de **esa escucha**, no el mejor
+  histórico (eso es lo que muestra la colección de abajo).
+- Debajo del nombre, en lugar del recuento, las especies que **nunca se habían
+  escuchado** se cantan con un **¡NUEVA!**; el resto indica por cuántas veces van.
+- **Pulsa cualquiera** para maximizarla: se abre la misma carta ampliada de la
+  colección, con todas las estadísticas acumuladas de esa especie.
+- Quien tenga activado *reducir movimiento* ve las cartas ya puestas, sin
+  revelado ni destellos.
 
 ## Tu colección: cartas tipo Ultimate Team
 

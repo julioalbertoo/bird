@@ -137,11 +137,15 @@
     }
     @keyframes pulse { 50% { opacity: 0.25; } }
 
-    /* Quien pide menos movimiento ve las barras y el punto quietos. */
+    /* Quien pide menos movimiento ve las barras y el punto quietos, y las
+       cartas del resultado aparecen ya puestas, sin el revelado del sobre. */
     @media (prefers-reduced-motion: reduce) {
         .record-btn.recording { animation: none; }
         .viz-bar { animation: none; height: 34%; }
         .countdown::before { animation: none; }
+        .reveal-card { opacity: 1; transform: none; animation: none; }
+        .reveal-card::before, .reveal-card .ut-card::before { display: none; }
+        .reveal-card.t-oro .ut-card { animation: none; }
     }
 
     .load-row {
@@ -182,7 +186,7 @@
     .error { color: var(--danger); margin-top: 16px; text-align: center; white-space: pre-wrap; font-size: 0.9rem; }
 
     .results { margin-top: 28px; display: none; }
-    .results h2, .sub-heading {
+    .results h2 {
         font-size: 12px;
         font-weight: 700;
         text-transform: uppercase;
@@ -190,68 +194,6 @@
         color: var(--subdued);
         margin: 0 0 14px;
     }
-    .sub-heading { margin-top: 24px; }
-
-    /* Top result — "now playing" style card */
-    .top {
-        background: linear-gradient(135deg, rgba(30, 215, 96, 0.18), rgba(30, 215, 96, 0.05) 60%, var(--surface-2));
-        border: 1px solid rgba(29, 185, 84, 0.45);
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 8px;
-        box-shadow: var(--shadow-medium);
-    }
-    .top .lead {
-        margin: 0 0 8px;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        color: var(--green);
-    }
-    .top .name { font-size: 1.65rem; font-weight: 900; letter-spacing: -0.5px; margin: 0; line-height: 1.15; }
-    .top .sci { font-style: italic; color: var(--subdued); margin: 4px 0 0; font-size: 0.92rem; }
-    .top .row { border: none; padding: 14px 0 0; }
-    .top .row:hover { background: transparent; }
-    .top.noise {
-        background: linear-gradient(135deg, rgba(255, 164, 43, 0.18), rgba(255, 164, 43, 0.05) 60%, var(--surface-2));
-        border-color: rgba(255, 164, 43, 0.45);
-    }
-    .top.noise .lead, .top.noise .conf { color: var(--warn); }
-    .top.noise .meter > span { background: var(--warn); }
-
-    /* Alternative results — tracklist-style rows */
-    .row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 10px 12px;
-        border-radius: 6px;
-        transition: background .15s ease;
-    }
-    .row:hover { background: var(--surface-3); }
-    .row .idx {
-        flex: 0 0 18px;
-        text-align: right;
-        color: var(--subdued);
-        font-variant-numeric: tabular-nums;
-        font-size: 0.95rem;
-    }
-    .row .info { flex: 1; min-width: 0; }
-    .row .n { font-weight: 700; font-size: 0.98rem; }
-    .row .s { font-style: italic; color: var(--subdued); font-size: 0.83rem; margin-top: 1px; }
-    .row.noise .n, .row.noise .conf { color: var(--warn); }
-    .row.noise .meter > span { background: var(--warn); }
-    .conf {
-        font-variant-numeric: tabular-nums;
-        color: var(--green);
-        font-weight: 700;
-        font-size: 0.92rem;
-        min-width: 42px;
-        text-align: right;
-    }
-    .meter { flex: 0 0 80px; height: 4px; border-radius: 9999px; background: var(--track); overflow: hidden; }
-    .meter > span { display: block; height: 100%; border-radius: 9999px; background: var(--green); }
     .empty { color: var(--subdued); text-align: center; padding: 14px 0; line-height: 1.6; }
 
     /* Historial acumulado — recuento de todo lo escuchado (guardado en el dispositivo) */
@@ -388,6 +330,85 @@
         opacity: .72;
         font-variant-numeric: tabular-nums;
     }
+
+    /* Cartas de lo que se acaba de escuchar, reveladas como un sobre de FUT.
+       El envoltorio es quien se mueve; la carta de dentro es la misma de la
+       colección, así que conserva su brillo y su efecto al pasar por encima. */
+    .reveal-grid { perspective: 900px; }
+    .reveal-card {
+        position: relative;
+        opacity: 0;
+        /* El envoltorio es quien ocupa la celda; la carta lo llena entero. */
+        display: flex;
+        transform-style: preserve-3d;
+        /* Cada carta entra un poco después que la anterior, una a una. */
+        animation: card-in .62s cubic-bezier(.2, .75, .3, 1.15) var(--d, 0s) forwards;
+    }
+    @keyframes card-in {
+        0%   { opacity: 0; transform: translateY(26px) rotateY(78deg) scale(.72); filter: brightness(2.4); }
+        55%  { opacity: 1; }
+        72%  { transform: translateY(0) rotateY(-10deg) scale(1.07); filter: brightness(1.35); }
+        100% { opacity: 1; transform: none; filter: none; }
+    }
+    /* Destello del color de la carta, justo cuando aterriza. */
+    .reveal-card::before {
+        content: '';
+        position: absolute;
+        inset: -22%;
+        z-index: -1;
+        border-radius: 50%;
+        background: radial-gradient(circle, var(--flash, rgba(255, 255, 255, .9)) 0%, transparent 62%);
+        opacity: 0;
+        pointer-events: none;
+        animation: card-flash .8s ease-out var(--d, 0s) forwards;
+    }
+    @keyframes card-flash {
+        0%   { opacity: 0; transform: scale(.35); }
+        45%  { opacity: .95; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.35); }
+    }
+    .reveal-card .ut-card { width: 100%; }
+    /* Barrido de luz por encima de la carta, como el foil al girarla. */
+    .reveal-card .ut-card::before {
+        content: '';
+        position: absolute;
+        top: -60%;
+        left: -120%;
+        z-index: 2;
+        width: 60%;
+        height: 220%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent);
+        transform: rotate(18deg);
+        pointer-events: none;
+        animation: card-shine .75s ease-in calc(var(--d, 0s) + .34s) forwards;
+    }
+    @keyframes card-shine { to { left: 170%; } }
+    .reveal-card.t-bronce { --flash: rgba(240, 198, 146, .9); }
+    .reveal-card.t-plata  { --flash: rgba(240, 243, 247, .9); }
+    /* El oro es el premio gordo: destella más y se queda un rato brillando. */
+    .reveal-card.t-oro    { --flash: rgba(255, 214, 102, .98); }
+    .reveal-card.t-oro::before { inset: -34%; animation-duration: 1.1s; }
+    .reveal-card.t-oro .ut-card { animation: gold-halo 1.6s ease-out var(--d, 0s) 2; }
+    @keyframes gold-halo {
+        0%, 100% { box-shadow: var(--shadow-medium); }
+        40%      { box-shadow: 0 0 26px 6px rgba(255, 205, 74, .6); }
+    }
+    /* Especie que aún no estaba en la colección: se canta como en los sobres. */
+    .ut-count.is-new {
+        opacity: 1;
+        font-weight: 900;
+        letter-spacing: 1.4px;
+    }
+
+    /* Aviso de arriba del resultado (ruido de fondo, nada reconocido…) */
+    .result-note {
+        margin: 0 0 14px;
+        color: var(--subdued);
+        font-size: .9rem;
+        line-height: 1.5;
+    }
+    .result-note.warn { color: var(--warn); }
+    .result-note b { color: var(--text); font-weight: 800; }
 
     /* Carta maximizada */
     .card-modal {
@@ -532,7 +553,7 @@
         <div id="error" class="error"></div>
 
         <div id="results" class="results">
-            <h2>Resultado</h2>
+            <h2>Lo que acabas de escuchar</h2>
             <div id="resultsBody"></div>
         </div>
     </main>
@@ -895,80 +916,60 @@ function renderResults(list) {
         resultsBody.innerHTML = '<div class="empty">No he reconocido nada con claridad.<br>Prueba en un lugar con menos ruido o más cerca del canto.</div>';
         return;
     }
-    const pct = c => (c * 100).toFixed(0);
     const top = list[0];
     const birds = list.filter(x => !nonBird(x));
-    let html;
+    // Qué había en la colección antes de esta grabación: así se sabe qué carta
+    // sale por primera vez y se puede cantar como nueva.
+    const known = loadHistory();
+    let note = '';
+    let shown;
 
     if (nonBird(top)) {
-        // Lo más probable NO es un pájaro: mostramos un aviso claro.
+        // Lo más probable NO es un pájaro: se avisa antes de enseñar las cartas.
         const nb = nonBird(top);
-        html = `
-        <div class="top noise">
-            <p class="lead">No parece un pájaro</p>
-            <p class="name">${nb.emoji} ${escapeHtml(nb.es)}</p>
-            <p class="sci">Esto suena a un sonido de fondo, no a un ave.</p>
-            <div class="row">
-                <div class="meter"><span style="width:${pct(top.confidence)}%"></span></div>
-                <div class="conf">${pct(top.confidence)}%</div>
-            </div>
-        </div>`;
         const bgBirds = birds.slice(0, 4);
-        if (birds.length) {
-            html += `<h2 class="sub-heading">Posibles aves de fondo</h2>`;
-            html += bgBirds.map((b, i) => renderRow(b, pct, i + 1)).join('');
-        } else {
-            html += `<div class="empty">No he detectado ningún pájaro por debajo del ruido.<br>Prueba de nuevo con menos ruido de fondo.</div>`;
+        note = `<p class="result-note warn">Lo que más suena no parece un pájaro: es
+                <b>${nb.emoji} ${escapeHtml(nb.es)}</b>.${birds.length ? ' Estas son las aves que se oyen por debajo.' : ''}</p>`;
+        if (!birds.length) {
+            note += `<p class="result-note">No he detectado ningún pájaro por debajo del ruido.<br>Prueba de nuevo con menos ruido de fondo.</p>`;
         }
-        resultsBody.innerHTML = html;
-        addToHistory([top, ...bgBirds]);
-        return;
+        shown = [top, ...bgBirds];
+    } else {
+        // Caso normal: el resultado principal es un ave (o rana/insecto que canta).
+        note = `<p class="result-note">La primera carta es la coincidencia principal; la valoración es
+                el acierto de esta escucha. Pulsa cualquiera para verla entera.</p>`;
+        shown = list.slice(0, 5);
     }
 
-    // Caso normal: el resultado principal es un ave (o rana/insecto que canta).
-    html = `
-        <div class="top">
-            <p class="lead">Coincidencia principal</p>
-            <p class="name">${itemEmoji(top)} ${escapeHtml(cap(top.name || top.enName || top.sciName))}</p>
-            <p class="sci">${escapeHtml(top.sciName)}${top.enName ? ' · ' + escapeHtml(top.enName) : ''}</p>
-            <div class="row">
-                <div class="meter"><span style="width:${pct(top.confidence)}%"></span></div>
-                <div class="conf">${pct(top.confidence)}%</div>
-            </div>
+    resultsBody.innerHTML = note + `
+        <div class="cards-grid reveal-grid">
+            ${shown.map((x, i) => renderResultCard(x, i, known)).join('')}
         </div>`;
-    const rest = list.slice(1, 5);
-    if (rest.length) {
-        html += `<h2 class="sub-heading">Otras posibilidades</h2>`;
-        html += rest.map((b, i) => renderRow(b, pct, i + 2)).join('');
-    }
-    resultsBody.innerHTML = html;
-    addToHistory([top, ...rest]);
+    addToHistory(shown);
 }
 
-// Una fila de la lista: aves con nombre científico; sonidos no-ave con su etiqueta.
-function renderRow(b, pct, idx) {
-    const nb = nonBird(b);
-    if (nb) {
-        return `
-            <div class="row noise">
-                <div class="idx">${idx}</div>
-                <div class="info">
-                    <div class="n">${nb.emoji} ${escapeHtml(nb.es)}</div>
-                    <div class="s">sonido de fondo</div>
-                </div>
-                <div class="meter"><span style="width:${pct(b.confidence)}%"></span></div>
-                <div class="conf">${pct(b.confidence)}%</div>
-            </div>`;
-    }
+// Carta de una detección recién escuchada. A diferencia de las de la colección,
+// la valoración es la confianza de esta escucha, no el mejor acierto histórico.
+function renderResultCard(x, idx, known) {
+    const nb = nonBird(x);
+    const rating = Math.round((x.confidence || 0) * 100);
+    const tier = tierOf(rating);
+    const label = nb ? nb.es : cap(x.name || x.enName || x.sciName);
+    const emoji = nb ? nb.emoji : itemEmoji(x);
+    const prev = known[x.sciName];
+    const badge = prev ? `${(prev.count || 0) + 1}×` : '¡NUEVA!';
     return `
-        <div class="row">
-            <div class="idx">${idx}</div>
-            <div class="info">
-                <div class="n">${itemEmoji(b)} ${escapeHtml(cap(b.name || b.enName || b.sciName))}</div>
-                <div class="s">${escapeHtml(b.sciName)}</div>
-            </div>
-            <div class="meter"><span style="width:${pct(b.confidence)}%"></span></div>
-            <div class="conf">${pct(b.confidence)}%</div>
+        <div class="reveal-card t-${tier.key}" style="--d:${(idx * 0.22).toFixed(2)}s">
+            <button class="ut-card ut-${tier.key}" type="button"
+                    data-key="${escapeHtml(x.sciName)}"
+                    aria-label="${escapeHtml(label)} · ${tier.label} ${rating}${prev ? '' : ' · nueva'}">
+                <div class="ut-top">
+                    <div class="ut-rating">${rating}</div>
+                </div>
+                <div class="ut-face">${emoji}</div>
+                <div class="ut-name">${escapeHtml(label)}</div>
+                <div class="ut-count${prev ? '' : ' is-new'}">${badge}</div>
+            </button>
         </div>`;
 }
 
@@ -1142,6 +1143,12 @@ function closeCard() {
 }
 
 historyBody.addEventListener('click', e => {
+    const card = e.target.closest('.ut-card');
+    if (card) openCard(card.dataset.key);
+});
+// Las cartas recién reveladas también se pueden maximizar, y entonces enseñan
+// las estadísticas de todas las veces que se ha escuchado esa especie.
+resultsBody.addEventListener('click', e => {
     const card = e.target.closest('.ut-card');
     if (card) openCard(card.dataset.key);
 });
