@@ -21,6 +21,13 @@ python3 -m http.server 8000
 2. Pulsa **Escuchar 10 segundos** y acerca el micrófono al canto.
 3. Verás la especie más probable y hasta 4 alternativas con su confianza.
 
+Mientras escucha, el botón late con un halo y aparece un **ecualizador de 28
+barras que se mueve con lo que entra por el micrófono** (un `AnalyserNode` mide
+el volumen de cada banda de frecuencia), junto a la cuenta atrás. Así se ve de
+un vistazo que el micro está captando sonido. Si el navegador no permite
+analizar el audio, las barras se mueven igual con una onda de CSS; y si el
+sistema pide menos movimiento (`prefers-reduced-motion`), se quedan quietas.
+
 Opcionalmente puedes permitir la geolocalización: BirdNET la usa para priorizar
 las especies probables en tu zona y época del año, y la app anota dónde
 conseguiste el mejor acierto de cada especie. Las coordenadas se guardan solo en

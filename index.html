@@ -84,15 +84,44 @@
     .record-btn:hover:not(:disabled) { transform: scale(1.03); filter: brightness(1.08); }
     .record-btn:active:not(:disabled) { transform: scale(0.99); filter: brightness(0.9); }
     .record-btn:disabled { cursor: not-allowed; background: var(--track); color: #9a9a9a; }
-    .record-btn.recording { background: var(--danger); }
+    /* Mientras escucha, el botón late con un halo que se expande. */
+    .record-btn.recording { background: var(--danger); animation: mic-glow 1.6s ease-out infinite; }
+    @keyframes mic-glow {
+        0%   { box-shadow: 0 0 0 0 rgba(243, 114, 127, .5); }
+        70%  { box-shadow: 0 0 0 14px rgba(243, 114, 127, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(243, 114, 127, 0); }
+    }
     .mic-icon { width: 20px; height: 20px; }
+
+    /* Barras que se mueven con lo que entra por el micrófono */
+    .viz {
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 5px;
+        height: 68px;
+        margin-top: 24px;
+    }
+    .viz-bar {
+        width: 6px;
+        height: 16%;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, var(--green) 0%, var(--green-border) 100%);
+        box-shadow: 0 0 10px rgba(30, 215, 96, .35);
+        /* Onda de reserva: si el navegador no deja analizar el micro, las barras
+           se mueven igual con esta animación de CSS. */
+        animation: viz-wave 1.1s ease-in-out infinite;
+    }
+    @keyframes viz-wave { 0%, 100% { height: 16%; } 50% { height: 76%; } }
+    /* Con analizador manda el volumen real: se apaga la onda de reserva. */
+    .viz.reactive .viz-bar { animation: none; transition: height .07s linear; }
 
     .countdown {
         display: none;
         align-items: center;
         justify-content: center;
         gap: 16px;
-        margin: 22px 0 -2px;
+        margin: 14px 0 -2px;
         font-size: 3.4rem;
         font-weight: 900;
         letter-spacing: -2px;
@@ -107,6 +136,13 @@
         animation: pulse 1s ease-in-out infinite;
     }
     @keyframes pulse { 50% { opacity: 0.25; } }
+
+    /* Quien pide menos movimiento ve las barras y el punto quietos. */
+    @media (prefers-reduced-motion: reduce) {
+        .record-btn.recording { animation: none; }
+        .viz-bar { animation: none; height: 34%; }
+        .countdown::before { animation: none; }
+    }
 
     .load-row {
         display: none;
@@ -486,6 +522,7 @@
             </svg>
             <span id="btnLabel">Cargando modelo…</span>
         </button>
+        <div id="viz" class="viz" aria-hidden="true"></div>
         <div id="countdown" class="countdown">10</div>
         <div id="loadRow" class="load-row">
             <div class="bar-track"><div id="barFill" class="bar-fill"></div></div>
@@ -535,6 +572,7 @@ const loadRow = el('loadRow');
 const barFill = el('barFill');
 const barPct = el('barPct');
 const countdown = el('countdown');
+const viz = el('viz');
 const results = el('results');
 const resultsBody = el('resultsBody');
 const historySection = el('history');
@@ -613,35 +651,111 @@ async function applyGeolocation(call) {
     if (pos) await call({ message: 'area-scores', latitude: pos.lat, longitude: pos.lon });
 }
 
+// ---- Animación de escucha: barras que suben y bajan con el sonido del micro ----
+const VIZ_BARS = 28;
+
+function buildViz() {
+    if (viz.children.length) return;
+    for (let i = 0; i < VIZ_BARS; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'viz-bar';
+        // Cada barra entra en la onda un poco más tarde; si no, subirían todas a la vez.
+        bar.style.animationDelay = (i * 0.055).toFixed(3) + 's';
+        viz.appendChild(bar);
+    }
+}
+
+// Enchufa el micrófono a un analizador y mueve las barras con el volumen de cada
+// banda de frecuencia. Devuelve la función que para la animación y la esconde.
+// Si el navegador no da analizador (o se pide menos movimiento), quedan las
+// barras animadas solo con CSS.
+function startViz(stream) {
+    buildViz();
+    viz.style.display = 'flex';
+
+    const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let ctx = null, raf = null;
+    if (!quieto) {
+        try {
+            ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.75;   // suaviza el salto entre fotogramas
+            ctx.createMediaStreamSource(stream).connect(analyser);
+
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            const bars = [...viz.children];
+            viz.classList.add('reactive');
+
+            // Los graves los llena el ruido de fondo y los agudos casi no traen
+            // señal: se reparte entre las barras la franja donde cantan las aves.
+            const desde = 2;
+            const hasta = Math.floor(data.length * 0.7);
+            const ancho = (hasta - desde) / bars.length;
+
+            const frame = () => {
+                analyser.getByteFrequencyData(data);
+                bars.forEach((bar, i) => {
+                    const ini = desde + Math.floor(i * ancho);
+                    const fin = Math.max(ini + 1, desde + Math.floor((i + 1) * ancho));
+                    let suma = 0;
+                    for (let k = ini; k < fin; k++) suma += data[k];
+                    const nivel = suma / (fin - ini) / 255;
+                    // Raíz cuadrada: así los cantos flojos también se ven moverse.
+                    bar.style.height = (16 + Math.sqrt(nivel) * 84).toFixed(1) + '%';
+                });
+                raf = requestAnimationFrame(frame);
+            };
+            frame();
+        } catch (_) { /* sin analizador: se queda la onda de CSS */ }
+    }
+
+    return () => {
+        if (raf) cancelAnimationFrame(raf);
+        if (ctx) ctx.close();
+        viz.classList.remove('reactive');
+        viz.style.display = 'none';
+        for (const bar of viz.children) bar.style.height = '';
+    };
+}
+
 // ---- Record N ms of microphone audio and return 48 kHz mono Float32 PCM ----
 async function recordMic(ms) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: {
         channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false
     }});
-    const rec = new MediaRecorder(stream);
-    const parts = [];
-    rec.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
+    const stopViz = startViz(stream);
+    let timer = null;
+    let blob;
+    try {
+        const rec = new MediaRecorder(stream);
+        const parts = [];
+        rec.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
 
-    const done = new Promise(resolve => { rec.onstop = resolve; });
-    rec.start();
+        const done = new Promise(resolve => { rec.onstop = resolve; });
+        rec.start();
 
-    // Countdown UI
-    countdown.style.display = 'flex';
-    let remaining = Math.round(ms / 1000);
-    countdown.textContent = remaining;
-    const timer = setInterval(() => {
-        remaining -= 1;
-        countdown.textContent = Math.max(0, remaining);
-    }, 1000);
+        // Countdown UI
+        countdown.style.display = 'flex';
+        let remaining = Math.round(ms / 1000);
+        countdown.textContent = remaining;
+        timer = setInterval(() => {
+            remaining -= 1;
+            countdown.textContent = Math.max(0, remaining);
+        }, 1000);
 
-    await new Promise(r => setTimeout(r, ms));
-    rec.stop();
-    await done;
-    clearInterval(timer);
-    countdown.style.display = 'none';
-    stream.getTracks().forEach(t => t.stop());
+        await new Promise(r => setTimeout(r, ms));
+        rec.stop();
+        await done;
+        blob = new Blob(parts, { type: rec.mimeType || 'audio/webm' });
+    } finally {
+        // Pase lo que pase, el micro se suelta y la animación se para.
+        clearInterval(timer);
+        stopViz();
+        countdown.style.display = 'none';
+        stream.getTracks().forEach(t => t.stop());
+    }
 
-    const blob = new Blob(parts, { type: rec.mimeType || 'audio/webm' });
     const arrayBuffer = await blob.arrayBuffer();
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
     const decoded = await ctx.decodeAudioData(arrayBuffer);
