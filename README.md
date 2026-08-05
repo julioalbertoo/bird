@@ -107,6 +107,8 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
 - Cada especie tiene **una sola carta**, la de **mayor categoría** alcanzada: la
   cuadrícula muestra solo la valoración y el nombre; la categoría ya se ve en el
   color de la carta, así que no se escribe.
+- **El icono se ve más nítido cuanto mejor es la carta**: en bronce sale bastante
+  desenfocado, en plata solo un poco y en oro perfectamente limpio.
 - **Pulsa una carta para maximizarla** (o navega con el tabulador y pulsa Enter).
   La carta ampliada añade el nombre científico, la categoría escrita y sus
   estadísticas: `MÁX` mejor acierto (la valoración), `MED` media, `MÍN` peor,

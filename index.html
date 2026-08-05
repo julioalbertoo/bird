@@ -254,13 +254,18 @@
         box-shadow: rgba(0, 0, 0, .55) 0 12px 26px;
         outline: none;
     }
+    /* El icono se ve más nítido cuanto mejor es la carta: el bronce queda
+       bastante desenfocado, la plata solo un poco y el oro perfectamente
+       limpio. El desenfoque va en `em` para que crezca con la carta grande. */
     .ut-bronce {
         background: linear-gradient(163deg, #6d3d17 0%, #b57a41 32%, #f0c692 50%, #b57a41 68%, #5f3413 100%);
         color: #3a2109;
+        --face-blur: .05em;
     }
     .ut-plata {
         background: linear-gradient(163deg, #575c68 0%, #a8aeb9 32%, #f0f3f7 50%, #a8aeb9 68%, #4e535e 100%);
         color: #23262b;
+        --face-blur: .024em;
     }
     .ut-oro {
         background: linear-gradient(163deg, #7d5a10 0%, #cfa029 32%, #f9e79a 50%, #cfa029 68%, #6f4f0c 100%);
@@ -299,6 +304,7 @@
         justify-content: center;
         font-size: 2.4rem;
         line-height: 1;
+        filter: blur(var(--face-blur, 0));
     }
     .ut-name {
         flex: none;
