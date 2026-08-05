@@ -54,6 +54,8 @@ async function main() {
     // en_us.txt gives "Scientific_English name"; es.txt gives "Scientific_Nombre en español".
     const birdsSci = (await cachedFetch('models/birdnet/labels/en_us.txt').then(r => r.text())).split('\n')
     const birdsEs  = (await cachedFetch('models/birdnet/labels/es.txt').then(r => r.text())).split('\n')
+    // El fichero acaba en salto de línea: esa última entrada vacía no es un ave.
+    while (birdsSci.length && !birdsSci[birdsSci.length - 1].trim()) birdsSci.pop()
     const birds = new Array(birdsSci.length)
     for (let i = 0; i < birdsSci.length; i++) {
         birds[i] = {
@@ -65,7 +67,14 @@ async function main() {
     }
     postMessage({ message: 'loaded' })
     const MIN_AUDIO_CONFIDENCE = 0.03
-    const MIN_AREA_CONFIDENCE = 0.0
+    // Frecuencia mínima de aparición de la especie en tu zona y semana para que
+    // se tenga en cuenta. Es el umbral por defecto de BirdNET (--sf_thresh 0.03);
+    // con 0 el filtro geográfico no descartaba nada y salían aves de otro
+    // continente. Subirlo filtra más; bajarlo deja pasar rarezas.
+    const MIN_AREA_CONFIDENCE = 0.03
+    // Última posición y semana con las que se calcularon los geoscores.
+    let areaAplicada = null
+
     onmessage = async function({ data }) {
         if (data.message === 'predict') {
             const predictionList = await BirdNetJS.predict(tf.tensor(data.pcmAudio, [data.pcmAudio.length / 144000, 144000]))
@@ -73,7 +82,7 @@ async function main() {
             for (let batch = 0; batch < predictionList.length; batch++) {
                 for (let i = 0; i < predictionList[batch].length; i++) {
                     const confidence = predictionList[batch][i]
-                    if (confidence > MIN_AUDIO_CONFIDENCE && birds[i].geoscore > MIN_AREA_CONFIDENCE) {
+                    if (confidence > MIN_AUDIO_CONFIDENCE && enZona(birds[i])) {
                         prediction.push({ ...birds[i], batch, confidence })
                     }
                 }
@@ -81,19 +90,44 @@ async function main() {
             postMessage({ message: 'predict', prediction })
         }
         if (data.message === 'area-scores') {
-            tf.engine().startScope()
-            const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-            startOfYear.setDate(startOfYear.getDate() + (1 - (startOfYear.getDay() % 7)))
-            const week = Math.round((new Date() - startOfYear) / 604800000) + 1
-            const areaTensor = tf.tensor([[data.latitude, data.longitude, week]])
-            const areaScores = await areaModel.predict(areaTensor).data()
-            tf.engine().endScope()
-            for (let i = 0; i < birds.length; i++) {
-                birds[i].geoscore = areaScores[i]
+            const week = birdnetWeek()
+            const lat = data.latitude, lon = data.longitude
+            // El modelo de zona trabaja sobre una rejilla gruesa: si no te has
+            // movido unos kilómetros ni ha cambiado la semana, daría lo mismo.
+            const mismaZona = areaAplicada && areaAplicada.week === week &&
+                Math.abs(areaAplicada.lat - lat) < 0.05 && Math.abs(areaAplicada.lon - lon) < 0.05
+            if (!mismaZona) {
+                tf.engine().startScope()
+                const areaTensor = tf.tensor([[lat, lon, week]])
+                const areaScores = await areaModel.predict(areaTensor).data()
+                tf.engine().endScope()
+                for (let i = 0; i < birds.length; i++) {
+                    // Si el modelo devolviera menos salidas que etiquetas, esas
+                    // especies se quedan sin filtrar en vez de desaparecer.
+                    birds[i].geoscore = i < areaScores.length ? areaScores[i] : 1
+                }
+                areaAplicada = { lat, lon, week }
             }
-            postMessage({ message: 'area-scores' })
+            postMessage({ message: 'area-scores', week, species: birds.filter(esperable).length })
         }
     }
+
+    // BirdNET también etiqueta sonidos que no son aves (perro, sirena, voz…).
+    // El modelo de zona no dice nada útil sobre ellos, así que nunca se filtran.
+    const SIN_ZONA = new Set([
+        'Dog', 'Engine', 'Environmental', 'Fireworks', 'Gun', 'Human non-vocal',
+        'Human vocal', 'Human whistle', 'Noise', 'Power tools', 'Siren',
+    ])
+    const esperable = bird => bird.geoscore > MIN_AREA_CONFIDENCE
+    const enZona = bird => SIN_ZONA.has(bird.sciName) || esperable(bird)
+}
+
+// El modelo geográfico de BirdNET parte el año en 48 semanas (4 por mes), no en
+// 52: hay que traducir la fecha a esa escala o recibe una semana que no existe
+// y la estacionalidad sale desplazada.
+function birdnetWeek(date = new Date()) {
+    const semanaDelMes = Math.min(4, Math.floor((date.getDate() - 1) / 7) + 1)
+    return date.getMonth() * 4 + semanaDelMes
 }
 
 async function predictModel() {

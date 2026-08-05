@@ -183,6 +183,13 @@
         color: var(--subdued);
         font-size: 0.9rem;
     }
+    .geo-note {
+        margin-top: 6px;
+        text-align: center;
+        color: var(--subdued);
+        font-size: 0.78rem;
+        opacity: 0.85;
+    }
     .error { color: var(--danger); margin-top: 16px; text-align: center; white-space: pre-wrap; font-size: 0.9rem; }
 
     .results { margin-top: 28px; display: none; }
@@ -556,6 +563,7 @@
             <div id="barPct" class="bar-pct">0%</div>
         </div>
         <div id="status" class="status" aria-live="polite">Preparando BirdNET…</div>
+        <div id="geoNote" class="geo-note"></div>
         <div id="error" class="error"></div>
 
         <div id="results" class="results">
@@ -594,6 +602,7 @@ const el = id => document.getElementById(id);
 const recordBtn = el('recordBtn');
 const btnLabel = el('btnLabel');
 const statusEl = el('status');
+const geoNote = el('geoNote');
 const errorEl = el('error');
 const loadRow = el('loadRow');
 const barFill = el('barFill');
@@ -661,6 +670,8 @@ function loadBirdNet() {
 // ---- Optional geolocation to refine which species are likely ----
 // Última ubicación conocida; también sirve para anotar dónde se oyó cada ave.
 let lastPos = null;
+// Resultado del último filtro de zona: { week, species } o null si no hay ubicación.
+let zona = null;
 
 async function getPosition(opts) {
     if (!navigator.geolocation) return null;
@@ -673,9 +684,20 @@ async function getPosition(opts) {
     return lastPos;
 }
 
-async function applyGeolocation(call) {
-    const pos = await getPosition();
-    if (pos) await call({ message: 'area-scores', latitude: pos.lat, longitude: pos.lon });
+// Pasa la ubicación al modelo geográfico, que marca qué especies son esperables
+// aquí y en esta época. Sin permiso de ubicación no se filtra nada: se
+// consideran las ~6.500 especies del mundo.
+async function applyGeolocation(call, opts) {
+    const pos = await getPosition(opts);
+    if (!pos) { zona = null; return; }
+    const res = await call({ message: 'area-scores', latitude: pos.lat, longitude: pos.lon });
+    zona = { week: res.week, species: res.species };
+}
+
+function renderGeoNote() {
+    geoNote.textContent = zona
+        ? `📍 Filtrando por tu zona: ${zona.species} especies esperables estos días.`
+        : '📍 Sin ubicación: se tienen en cuenta las especies de todo el mundo.';
 }
 
 // ---- Animación de escucha: barras que suben y bajan con el sonido del micro ----
@@ -1230,11 +1252,12 @@ async function run() {
         setStatus('Escuchando el audio con BirdNET…');
         setBar(0);
         showBar(true);
-        // Se refresca la ubicación mientras se analiza, para anotar dónde se grabó.
-        // Vale una posición de hace unos minutos: no hace falta molestar al GPS.
-        const pos = getPosition({ maximumAge: 5 * 60 * 1000, timeout: 4000 });
+        // La ubicación se refresca antes de analizar: el filtro de zona tiene que
+        // estar puesto antes de la primera predicción (y sirve para anotar dónde
+        // se grabó). Vale una posición de hace unos minutos, así que apenas tarda.
+        await applyGeolocation(birdNet, { maximumAge: 5 * 60 * 1000, timeout: 4000 });
+        renderGeoNote();
         const list = await identify(pcm);
-        await pos;
         renderResults(list);
         setStatus('Listo. Pulsa para escuchar de nuevo.');
     } catch (e) {
@@ -1265,6 +1288,7 @@ recordBtn.addEventListener('click', run);
         showBar(false);
         setStatus('Buscando tu ubicación (opcional)…');
         await applyGeolocation(birdNet);
+        renderGeoNote();
         setStatus('Listo. Pulsa para escuchar 10 segundos.');
         btnLabel.textContent = 'Escuchar 10 segundos';
         recordBtn.disabled = false;

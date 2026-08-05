@@ -28,10 +28,19 @@ un vistazo que el micro está captando sonido. Si el navegador no permite
 analizar el audio, las barras se mueven igual con una onda de CSS; y si el
 sistema pide menos movimiento (`prefers-reduced-motion`), se quedan quietas.
 
-Opcionalmente puedes permitir la geolocalización: BirdNET la usa para priorizar
-las especies probables en tu zona y época del año, y la app anota dónde
-conseguiste el mejor acierto de cada especie. Las coordenadas se guardan solo en
-tu dispositivo, igual que el resto de la colección.
+Opcionalmente puedes permitir la geolocalización: BirdNET tiene un **modelo
+geográfico** aparte que, a partir de latitud, longitud y semana del año, estima
+cómo de habitual es cada especie ahí y en esa época. Las que no llegan al umbral
+se descartan directamente, así que no salen aves de otro continente. Debajo del
+botón se indica si el filtro está activo y cuántas especies son esperables en tu
+zona; sin permiso de ubicación no se filtra nada y se consideran las ~6.500
+especies del mundo. La app también anota dónde conseguiste el mejor acierto de
+cada especie. Las coordenadas se guardan solo en tu dispositivo, igual que el
+resto de la colección.
+
+Dos detalles del modelo geográfico: parte el año en **48 semanas** (4 por mes,
+no 52), y no sabe nada de los sonidos que no son aves (perro, sirena, voz…), así
+que esos nunca se filtran por zona.
 
 ## ¿Con qué confianza se considera un acierto?
 
@@ -42,7 +51,7 @@ en `birdnet.js`:
 | Constante | Valor | Qué hace |
 |-----------|-------|----------|
 | `MIN_AUDIO_CONFIDENCE` | `0.03` (**3 %**) | Confianza mínima para que una especie cuente como detección. Por debajo se descarta como ruido. |
-| `MIN_AREA_CONFIDENCE` | `0.0` (**0 %**) | Umbral geográfico. En `0` no descarta ninguna especie por la zona; el dato geográfico solo se usa para reordenar. |
+| `MIN_AREA_CONFIDENCE` | `0.03` (**3 %**) | Umbral geográfico: frecuencia mínima con la que la especie aparece en tu zona y semana para que se tenga en cuenta. Es el valor por defecto de BirdNET (`--sf_thresh`). |
 
 Es decir: **a partir del 3 % una especie ya se considera un acierto** y aparece
 en la lista. Es un umbral deliberadamente bajo (BirdNET reparte la probabilidad
@@ -51,7 +60,9 @@ fuertes). El porcentaje que ves junto a cada ave es esa confianza, no una
 probabilidad de que sea "la correcta".
 
 Puedes hacerlo más estricto subiendo `MIN_AUDIO_CONFIDENCE` (por ejemplo `0.1`
-para pedir al menos un 10 %) o filtrar por zona subiendo `MIN_AREA_CONFIDENCE`.
+para pedir al menos un 10 %) o afinar el filtro de zona con
+`MIN_AREA_CONFIDENCE`: subirlo deja fuera a las especies poco frecuentes de tu
+área, bajarlo permite que aparezcan rarezas y aves de paso.
 
 ## ¿Y si escucha varias aves (o varios sonidos)?
 
