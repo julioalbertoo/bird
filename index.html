@@ -1065,14 +1065,22 @@ function addToHistory(items) {
         if (seen.has(it.key)) continue;   // no contar dos veces en la misma grabación
         seen.add(it.key);
         const now = Date.now();
-        const cur = h[it.key] || { count: 0, confs: [] };
+        const cur = h[it.key] || { count: 0, confs: [], confsZona: [] };
         if (!Array.isArray(cur.confs)) cur.confs = [];   // migra entradas antiguas sin confianzas
+        if (!Array.isArray(cur.confsZona)) cur.confsZona = [];
         cur.count += 1;
         if (it.conf !== null) {
             const conf = Math.round(it.conf * 10000) / 10000;
             cur.confs.push(conf);
+            // Una escucha con filtro de zona vale más que cualquiera hecha a
+            // ciegas: en cuanto llega la primera, la carta se valora solo con ese
+            // grupo y las anteriores dejan de contar para la nota.
+            const teniaZona = cur.confsZona.length > 0;
+            if (zona) cur.confsZona.push(conf);
+            const mandaEsta = !!zona || !teniaZona;
+            const primeraConZona = !!zona && !teniaZona;
             // Cuándo y dónde se consiguió el mejor acierto: es lo que luce la carta.
-            if (!cur.best || conf > cur.best.conf) {
+            if (mandaEsta && (primeraConZona || !cur.best || conf > cur.best.conf)) {
                 cur.best = { conf, at: now };
                 if (lastPos) { cur.best.lat = lastPos.lat; cur.best.lon = lastPos.lon; }
             }
@@ -1102,13 +1110,19 @@ const TIERS = [
 // Sin ubicación no se filtra por zona, así que la especie no se ha contrastado
 // con lo que de verdad vuela por allí: por muy alta que sea la confianza, esa
 // carta no se lleva medalla. Vuelve a escucharla con la ubicación activada y
-// pasa a la categoría que le toque.
+// pasa a la categoría de su mejor nota con zona, que es la única que cuenta
+// desde ese momento: un 90 % logrado a ciegas no sirve para subir de categoría.
 const SIN_ZONA = { key: 'negro', label: 'Sin zona' };
 const tierOf = (rating, conZona = true) => conZona ? TIERS.find(t => rating >= t.min) : SIN_ZONA;
 
-// Estadísticas de la carta a partir de todas las confianzas guardadas.
+// Estadísticas de la carta. Mandan las escuchas hechas con el filtro de zona
+// puesto: en cuanto hay una, la carta se valora solo con ellas, así que la nota
+// nunca viene de una detección sin contrastar. Si no hay ninguna (carta negra, o
+// entrada anterior a esta regla), se usan todas las confianzas guardadas.
 function cardStats(v) {
-    const pcts = (Array.isArray(v.confs) ? v.confs : []).map(c => c * 100);
+    const todas = Array.isArray(v.confs) ? v.confs : [];
+    const deZona = Array.isArray(v.confsZona) ? v.confsZona : [];
+    const pcts = (deZona.length ? deZona : todas).map(c => c * 100);
     const media = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
     // La valoración de la carta es el mejor acierto conseguido, no la media.
     const rating = pcts.length ? Math.round(Math.max(...pcts)) : 0;
@@ -1191,7 +1205,7 @@ function renderBigCard(key, v) {
             <div class="ut-meta">
                 Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
                 ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${mapsLink(st.bestLat, st.bestLon, st.bestLoc)}` : ''}</div>` : ''}
-                ${st.conZona ? '' : `<div class="ut-best">Escuchada sin ubicación: sin filtro por zona no se le da categoría. Vuelve a escucharla con la ubicación activada.</div>`}
+                ${st.conZona ? '' : `<div class="ut-best">Escuchada sin ubicación: sin filtro por zona no se le da categoría. Vuelve a escucharla con la ubicación activada y contará esa nota.</div>`}
             </div>
         </div>`;
 }

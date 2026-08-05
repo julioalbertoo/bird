@@ -120,11 +120,21 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
 **…salvo que la escucharas sin ubicación.** Sin geolocalización no hay filtro
 por zona: la especie no se ha contrastado con lo que de verdad vuela por allí,
 así que por muy alta que sea la confianza **no se lleva medalla** y sale como
-**carta negra** (⬛ *Sin zona*), detrás de todas las demás en la colección. Basta
-con volver a escucharla **una vez** con la ubicación activada para que pase a la
-categoría que le corresponda. Las cartas que ya estaban en la colección antes de
-esta regla conservan la suya: no hay forma de saber si se escucharon con
-ubicación, y no tendría gracia que la colección entera se volviera negra.
+**carta negra** (⬛ *Sin zona*), detrás de todas las demás en la colección.
+
+Basta con volver a escucharla **una vez** con la ubicación activada para que
+recupere medalla, y a partir de ese momento **la carta se valora solo con las
+escuchas hechas con zona**: la categoría sale de la mejor nota lograda con la
+ubicación activada, y todas sus estadísticas (`MÁX`, `MED`, `MÍN`, `ÚLT`, `REG`)
+se calculan con ese grupo. Un 95 % conseguido a ciegas no sirve para subir de
+categoría; solo `VEC` sigue contando todas las veces que la has escuchado.
+
+Las cartas que ya estaban en la colección antes de esta regla conservan su
+categoría: no hay forma de saber si se escucharon con ubicación, y no tendría
+gracia que la colección entera se volviera negra. Eso sí, en cuanto vuelvas a
+escuchar una de ellas con la ubicación puesta pasa a valorarse solo con esa
+nota, que es la primera contrastada de verdad — así que puede bajar de
+categoría.
 
 - Cada especie tiene **una sola carta**, la de **mayor categoría** alcanzada: la
   cuadrícula muestra solo la valoración y el nombre; la categoría ya se ve en el
@@ -138,7 +148,8 @@ ubicación, y no tendría gracia que la colección entera se volviera negra.
   `ÚLT` último, `REG` regularidad (100 = siempre acierta parecido) y `VEC` veces
   escuchada. Debajo indica **cuándo y dónde se logró el `MÁX`** (fecha y
   coordenadas); la ubicación solo aparece si diste permiso de geolocalización en
-  esa grabación. Se cierra con la ✕, con Escape o pulsando fuera.
+  esa grabación. Las cartas negras avisan además de que están sin categoría por
+  haberse escuchado sin ubicación. Se cierra con la ✕, con Escape o pulsando fuera.
 - Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro); las
   **negras** van detrás de todas las que tienen medalla, y los **sonidos que no
   son aves** (motor, voz humana, ruido…) siempre al final.
