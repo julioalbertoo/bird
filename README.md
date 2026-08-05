@@ -93,7 +93,9 @@ la recorre al aterrizar. Las de **oro** son el premio gordo: destellan más fuer
 y se quedan un rato con el halo dorado.
 
 - La **valoración** de estas cartas es el acierto de **esa escucha**, no el mejor
-  histórico (eso es lo que muestra la colección de abajo).
+  histórico (eso es lo que muestra la colección de abajo). La categoría también
+  mira solo a esa escucha: si la hiciste sin ubicación, salen todas negras
+  aunque en la colección esas especies ya tuvieran medalla.
 - Debajo del nombre, en lugar del recuento, las especies que **nunca se habían
   escuchado** se cantan con un **¡NUEVA!**; el resto indica por cuántas veces van.
 - **Pulsa cualquiera** para maximizarla: se abre la misma carta ampliada de la
@@ -115,11 +117,21 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
 | 🥈 **Plata** | de 65 a 74 |
 | 🥇 **Oro** | 75 o más |
 
+**…salvo que la escucharas sin ubicación.** Sin geolocalización no hay filtro
+por zona: la especie no se ha contrastado con lo que de verdad vuela por allí,
+así que por muy alta que sea la confianza **no se lleva medalla** y sale como
+**carta negra** (⬛ *Sin zona*), detrás de todas las demás en la colección. Basta
+con volver a escucharla **una vez** con la ubicación activada para que pase a la
+categoría que le corresponda. Las cartas que ya estaban en la colección antes de
+esta regla conservan la suya: no hay forma de saber si se escucharon con
+ubicación, y no tendría gracia que la colección entera se volviera negra.
+
 - Cada especie tiene **una sola carta**, la de **mayor categoría** alcanzada: la
   cuadrícula muestra solo la valoración y el nombre; la categoría ya se ve en el
   color de la carta, así que no se escribe.
-- **El icono se ve más nítido cuanto mejor es la carta**: en bronce sale bastante
-  desenfocado, en plata solo un poco y en oro perfectamente limpio.
+- **El icono se ve más nítido cuanto mejor es la carta**: la negra es la más
+  borrosa, el bronce sale bastante desenfocado, la plata solo un poco y el oro
+  perfectamente limpio.
 - **Pulsa una carta para maximizarla** (o navega con el tabulador y pulsa Enter).
   La carta ampliada añade el nombre científico, la categoría escrita y sus
   estadísticas: `MÁX` mejor acierto (la valoración), `MED` media, `MÍN` peor,
@@ -127,8 +139,9 @@ es una **carta** al estilo Ultimate Team, en una cuadrícula de **3 por fila**.
   escuchada. Debajo indica **cuándo y dónde se logró el `MÁX`** (fecha y
   coordenadas); la ubicación solo aparece si diste permiso de geolocalización en
   esa grabación. Se cierra con la ✕, con Escape o pulsando fuera.
-- Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro), y los
-  **sonidos que no son aves** (motor, voz humana, ruido…) van siempre al final.
+- Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro); las
+  **negras** van detrás de todas las que tienen medalla, y los **sonidos que no
+  son aves** (motor, voz humana, ruido…) siempre al final.
 - Cada especie luce el **icono de su grupo** (ver abajo), y los sonidos que no son
   aves el suyo: 🐕 perro, 🚗 motor, 🗣️ voz…
 - Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a

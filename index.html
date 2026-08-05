@@ -261,9 +261,24 @@
         box-shadow: rgba(0, 0, 0, .55) 0 12px 26px;
         outline: none;
     }
-    /* El icono se ve más nítido cuanto mejor es la carta: el bronce queda
-       bastante desenfocado, la plata solo un poco y el oro perfectamente
-       limpio. El desenfoque va en `em` para que crezca con la carta grande. */
+    /* El icono se ve más nítido cuanto mejor es la carta: la negra es la más
+       borrosa, el bronce queda bastante desenfocado, la plata solo un poco y el
+       oro perfectamente limpio. El desenfoque va en `em` para que crezca con la
+       carta grande. */
+    /* Sin ubicación no hay filtro por zona, así que la detección no está
+       contrastada con lo que vuela por allí: esas cartas no reciben medalla. */
+    .ut-negro {
+        background: linear-gradient(163deg, #000 0%, #101317 32%, #22262d 50%, #101317 68%, #000 100%);
+        color: #e9edf3;
+        --face-blur: .075em;
+        /* Sobre el fondo oscuro de la página el canto se perdería. */
+        border: 1px solid rgba(255, 255, 255, .13);
+    }
+    /* El foil de las demás cartas la volvería gris: aquí queda apenas insinuado. */
+    .ut-negro::after {
+        background: linear-gradient(118deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,.03) 34%, rgba(255,255,255,0) 46%);
+    }
+    .ut-negro .ut-name { border-top-color: rgba(255, 255, 255, .2); }
     .ut-bronce {
         background: linear-gradient(163deg, #6d3d17 0%, #b57a41 32%, #f0c692 50%, #b57a41 68%, #5f3413 100%);
         color: #3a2109;
@@ -396,6 +411,7 @@
         animation: card-shine .75s ease-in calc(var(--d, 0s) + .34s) forwards;
     }
     @keyframes card-shine { to { left: 170%; } }
+    .reveal-card.t-negro  { --flash: rgba(150, 160, 176, .75); }
     .reveal-card.t-bronce { --flash: rgba(240, 198, 146, .9); }
     .reveal-card.t-plata  { --flash: rgba(240, 243, 247, .9); }
     /* El oro es el premio gordo: destella más y se queda un rato brillando. */
@@ -977,11 +993,13 @@ function renderResults(list) {
 }
 
 // Carta de una detección recién escuchada. A diferencia de las de la colección,
-// la valoración es la confianza de esta escucha, no el mejor acierto histórico.
+// la valoración es la confianza de esta escucha, no el mejor acierto histórico;
+// y la categoría depende de si esta escucha llevaba filtro de zona, no de si lo
+// llevó alguna anterior.
 function renderResultCard(x, idx, known) {
     const nb = nonBird(x);
     const rating = Math.round((x.confidence || 0) * 100);
-    const tier = tierOf(rating);
+    const tier = tierOf(rating, !!zona);
     const label = nb ? nb.es : cap(x.name || x.enName || x.sciName);
     const emoji = nb ? nb.emoji : itemEmoji(x);
     const prev = known[x.sciName];
@@ -1013,6 +1031,19 @@ function loadHistory() {
 }
 function saveHistory(h) {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch (_) { /* modo privado / sin espacio */ }
+}
+
+// Las cartas que ya estaban en la colección se quedan con su categoría de
+// siempre: no hay forma de saber si se escucharon con ubicación, y no tendría
+// gracia que la colección entera se volviera negra de un día para otro. La regla
+// de la carta negra solo se aplica a lo que se escuche a partir de ahora.
+function migrarZona() {
+    const h = loadHistory();
+    let cambia = false;
+    for (const v of Object.values(h)) {
+        if (v.conZona === undefined) { v.conZona = true; cambia = true; }
+    }
+    if (cambia) saveHistory(h);
 }
 
 // Convierte una detección en una entrada de historial con su icono representativo.
@@ -1047,6 +1078,9 @@ function addToHistory(items) {
             }
         }
         cur.lastAt = now;                 // fecha de la última vez que se escuchó
+        // Basta con haberla escuchado una vez con el filtro de zona puesto para
+        // que la carta deje de ser negra y opte a medalla.
+        cur.conZona = cur.conZona === true || !!zona;
         cur.label = it.label;
         cur.emoji = it.emoji;
         cur.sci = it.sci;
@@ -1065,7 +1099,12 @@ const TIERS = [
     { min: 65, key: 'plata',  label: 'Plata' },
     { min: 0,  key: 'bronce', label: 'Bronce' },
 ];
-const tierOf = rating => TIERS.find(t => rating >= t.min);
+// Sin ubicación no se filtra por zona, así que la especie no se ha contrastado
+// con lo que de verdad vuela por allí: por muy alta que sea la confianza, esa
+// carta no se lleva medalla. Vuelve a escucharla con la ubicación activada y
+// pasa a la categoría que le toque.
+const SIN_ZONA = { key: 'negro', label: 'Sin zona' };
+const tierOf = (rating, conZona = true) => conZona ? TIERS.find(t => rating >= t.min) : SIN_ZONA;
 
 // Estadísticas de la carta a partir de todas las confianzas guardadas.
 function cardStats(v) {
@@ -1086,7 +1125,8 @@ function cardStats(v) {
         rating,
         // Las entradas guardadas antes de registrar confianzas no tienen datos.
         has: pcts.length > 0,
-        tier: tierOf(rating),
+        tier: tierOf(rating, v.conZona !== false),
+        conZona: v.conZona !== false,
         media: Math.round(media),
         min: pcts.length ? Math.round(Math.min(...pcts)) : 0,
         last: pcts.length ? Math.round(pcts[pcts.length - 1]) : 0,
@@ -1151,6 +1191,7 @@ function renderBigCard(key, v) {
             <div class="ut-meta">
                 Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
                 ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${mapsLink(st.bestLat, st.bestLon, st.bestLoc)}` : ''}</div>` : ''}
+                ${st.conZona ? '' : `<div class="ut-best">Escuchada sin ubicación: sin filtro por zona no se le da categoría. Vuelve a escucharla con la ubicación activada.</div>`}
             </div>
         </div>`;
 }
@@ -1219,11 +1260,15 @@ function lastSeen(v) { return fmtDate(v.lastAt); }
 function renderHistory() {
     const h = loadHistory();
     // Los sonidos que no son aves (coche, voz humana…) van al final de la colección;
-    // dentro de cada grupo mandan las cartas de más valoración (oro antes que plata y bronce).
+    // dentro de cada grupo mandan las cartas de más valoración (oro antes que plata
+    // y bronce), y las negras van detrás de todas las que sí tienen medalla.
     const entries = Object.entries(h).sort((a, b) => {
         const birdDiff = (b[1].isBird ? 1 : 0) - (a[1].isBird ? 1 : 0);
         if (birdDiff) return birdDiff;
-        const ratingDiff = cardStats(b[1]).rating - cardStats(a[1]).rating;
+        const ea = cardStats(a[1]), eb = cardStats(b[1]);
+        const zonaDiff = (eb.conZona ? 1 : 0) - (ea.conZona ? 1 : 0);
+        if (zonaDiff) return zonaDiff;
+        const ratingDiff = eb.rating - ea.rating;
         if (ratingDiff) return ratingDiff;
         return (b[1].count || 0) - (a[1].count || 0);
     });
@@ -1280,6 +1325,7 @@ async function run() {
 recordBtn.addEventListener('click', run);
 
 (async function init() {
+    migrarZona();
     renderHistory();
     try {
         setBar(0);
