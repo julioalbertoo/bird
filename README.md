@@ -150,6 +150,12 @@ categoría.
   coordenadas); la ubicación solo aparece si diste permiso de geolocalización en
   esa grabación. Las cartas negras avisan además de que están sin categoría por
   haberse escuchado sin ubicación. Se cierra con la ✕, con Escape o pulsando fuera.
+- La carta ampliada de un ave enseña también un enlace **📖 Wikipedia** al
+  artículo de la especie. Solo aparece **si el artículo existe**: se comprueba
+  con la API de Wikipedia buscando el nombre científico primero en español y,
+  si esa especie no lo tiene, en inglés (entonces el enlace pone `📖 Wikipedia
+  (EN)`). El resultado se guarda en el dispositivo, así que cada especie se
+  consulta una sola vez; sin conexión la carta sale igual, sin enlace.
 - Las cartas se ordenan por **valoración, de mayor a menor** (primero el oro); las
   **negras** van detrás de todas las que tienen medalla, y los **sonidos que no
   son aves** (motor, voz humana, ruido…) siempre al final.

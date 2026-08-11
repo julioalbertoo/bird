@@ -1206,6 +1206,7 @@ function renderBigCard(key, v) {
                 Escuchada ${st.count} ${st.count === 1 ? 'vez' : 'veces'}${date ? ` · última: ${escapeHtml(date)}` : ''}
                 ${st.bestAt ? `<div class="ut-best">Máx: ${escapeHtml(st.bestAt)}${st.bestLoc ? `<br>en ${mapsLink(st.bestLat, st.bestLon, st.bestLoc)}` : ''}</div>` : ''}
                 ${st.conZona ? '' : `<div class="ut-best">Escuchada sin ubicación: sin filtro por zona no se le da categoría. Vuelve a escucharla con la ubicación activada y contará esa nota.</div>`}
+                ${v.sci ? `<div class="ut-best" id="wikiLink" hidden></div>` : ''}
             </div>
         </div>`;
 }
@@ -1213,16 +1214,23 @@ function renderBigCard(key, v) {
 const cardModal = el('cardModal');
 const cardModalBody = el('cardModalBody');
 
+// Qué carta está maximizada ahora mismo: el enlace a Wikipedia llega por red y
+// puede tardar, así que hay que saber si al volver sigue abierta la misma.
+let cardAbierta = null;
+
 function openCard(key) {
     const v = loadHistory()[key];
     if (!v) return;
     cardModalBody.innerHTML = renderBigCard(key, v);
     cardModal.hidden = false;
+    cardAbierta = key;
     el('closeCard').focus();
+    pintarWiki(key, v);
 }
 function closeCard() {
     cardModal.hidden = true;
     cardModalBody.innerHTML = '';
+    cardAbierta = null;
 }
 
 historyBody.addEventListener('click', e => {
@@ -1266,6 +1274,80 @@ function mapsLink(lat, lon, texto) {
     return `<a class="ut-mapa" href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(q)}"
                target="_blank" rel="noopener noreferrer"
                title="Ver en Google Maps">${escapeHtml(texto)}</a>`;
+}
+
+// ---- Enlace a Wikipedia ----
+// BirdNET conoce ~6.500 especies y muchas no tienen artículo, así que antes de
+// enseñar el enlace se comprueba con la API que el artículo existe de verdad.
+const WIKI_KEY = 'birdnet_wiki_v1';   // artículos ya consultados, guardados en el dispositivo
+const wikiEnCurso = new Map();        // no repetir la misma consulta en la misma sesión
+
+function loadWikiCache() {
+    try { return JSON.parse(localStorage.getItem(WIKI_KEY)) || {}; }
+    catch (_) { return {}; }
+}
+function saveWikiCache(c) {
+    try { localStorage.setItem(WIKI_KEY, JSON.stringify(c)); } catch (_) { /* modo privado / sin espacio */ }
+}
+
+// Busca el artículo de una especie por su nombre científico en una Wikipedia.
+// Devuelve la URL canónica, o null si no hay artículo. Si falla la red lanza,
+// para distinguir «no existe» de «no se ha podido preguntar».
+async function consultarWiki(lang, sci) {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
+              + `&redirects=1&prop=info&inprop=url&titles=${encodeURIComponent(sci)}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Wikipedia ${lang}: ${r.status}`);
+    const pages = (await r.json())?.query?.pages || {};
+    // Una sola página: existe si no viene marcada como «missing».
+    const page = Object.values(pages)[0];
+    return page && page.missing === undefined && page.fullurl ? page.fullurl : null;
+}
+
+// Primero en español; si esa especie no tiene artículo, se prueba en inglés,
+// que es donde están casi todas las exóticas.
+async function buscarWiki(sci) {
+    const cache = loadWikiCache();
+    if (Object.prototype.hasOwnProperty.call(cache, sci)) return cache[sci];
+    if (wikiEnCurso.has(sci)) return wikiEnCurso.get(sci);
+
+    const busca = (async () => {
+        try {
+            for (const lang of ['es', 'en']) {
+                const url = await consultarWiki(lang, sci);
+                if (url) {
+                    const hit = { url, lang };
+                    saveWikiCache({ ...loadWikiCache(), [sci]: hit });
+                    return hit;
+                }
+            }
+            // Ninguna de las dos lo tiene: se recuerda para no volver a preguntar.
+            saveWikiCache({ ...loadWikiCache(), [sci]: null });
+            return null;
+        } catch (_) {
+            // Sin conexión o API caída: no se cachea, para reintentarlo otro día.
+            return null;
+        } finally {
+            wikiEnCurso.delete(sci);
+        }
+    })();
+
+    wikiEnCurso.set(sci, busca);
+    return busca;
+}
+
+// Añade el enlace a la carta maximizada cuando llega la respuesta. Si mientras
+// tanto se cerró la carta o se abrió otra, no se pinta nada.
+async function pintarWiki(key, v) {
+    if (!v.sci) return;
+    const hit = await buscarWiki(v.sci);
+    if (!hit || cardAbierta !== key) return;
+    const hueco = el('wikiLink');
+    if (!hueco) return;
+    hueco.innerHTML = `<a class="ut-mapa" href="${escapeHtml(hit.url)}"
+           target="_blank" rel="noopener noreferrer"
+           title="Ver el artículo en Wikipedia">📖 Wikipedia${hit.lang === 'en' ? ' (EN)' : ''}</a>`;
+    hueco.hidden = false;
 }
 
 // Fecha de la última escucha.
