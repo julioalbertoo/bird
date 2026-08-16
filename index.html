@@ -1446,13 +1446,20 @@ function renderForest(entries) {
     const topes = { ...cuenta };
     const cabe = () => { pintaBosque(cuenta, topes); return alto() <= maxAlto; };
     if (!cabe()) {
-        // Se planta el mismo porcentaje de las tres categorías, para que el
-        // bosque sea el de siempre en pequeño: mucho arbusto y algún árbol
-        // grande suelto. Solo el bronce dice cuánto se ha quedado sin plantar;
-        // en oros y platas no hay nada que apuntar, la colección entera está en
-        // las cartas de debajo.
+        // Los oros y las platas se plantan siempre todos: si hay dos oros, se
+        // ven dos árboles grandes. El sitio lo cede el bronce, que es lo que
+        // abunda, y lo que se queda sin plantar se cuenta en su “+N”.
+        topes.bronce = mayorQueCabe(cuenta.bronce, n => { topes.bronce = n; return cabe(); });
+    }
+    if (!cabe()) {
+        // Última salida, con una colección enorme: ni los oros y las platas
+        // solos caben en tres líneas, así que se planta el mismo porcentaje de
+        // los dos. Sin “+N”: la colección entera está en las cartas de debajo.
         const porcion = pc => {
-            for (const f of FOREST) topes[f.key] = cuenta[f.key] ? Math.max(1, Math.round(cuenta[f.key] * pc / 100)) : 0;
+            for (const f of FOREST) {
+                if (f.resto) continue;
+                topes[f.key] = cuenta[f.key] ? Math.max(1, Math.round(cuenta[f.key] * pc / 100)) : 0;
+            }
         };
         porcion(mayorQueCabe(100, pc => { porcion(pc); return cabe(); }));
         pintaBosque(cuenta, topes);
