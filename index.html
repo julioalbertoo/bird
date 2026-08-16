@@ -228,31 +228,32 @@
 
     /* Bosque de la cabecera — un vistazo a la colección sin contar cartas: un
        árbol grande por cada oro, uno más pequeño por cada plata y un arbusto por
-       cada bronce. Todo se apoya en la misma línea de suelo (align-items: flex-end)
-       para que las alturas se comparen de un golpe de vista. */
+       cada bronce. Los árboles van pegados unos a otros, como texto corrido, así
+       que se apoyan solos en la misma línea base: el suelo del bosque. */
     .hist-forest {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 2px 1px;
-        line-height: 1;
+        line-height: var(--hf-linea, 34px);
         margin-bottom: 14px;
         padding-bottom: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, .08);
     }
     .hist-forest:empty { display: none; }
-    .hist-forest span { display: inline-block; }
+    /* El bosque nunca pasa de tres líneas: quien recorta es renderForest, que mide
+       una línea de verdad y planta solo lo que cabe. Este alto máximo (tres líneas
+       de las más altas, las de los árboles grandes) es solo la última red por si
+       la medida no se pudiera tomar. */
+    .hf-rows {
+        max-height: 120px;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+    }
     .f-oro    { font-size: 30px; }
     .f-plata  { font-size: 20px; }
     .f-bronce { font-size: 13px; }
-    /* Cuando hay tantas cartas de una categoría que no cabrían, se corta la fila
-       y el resto se cuenta con un “+N” discreto. */
     .f-mas {
         font-size: 11px;
         font-weight: 700;
         color: var(--subdued);
-        align-self: flex-end;
-        padding: 0 4px 2px 1px;
+        padding: 0 4px 0 2px;
     }
 
     /* Cartas tipo Ultimate Team — 3 por fila, ampliables al pulsarlas */
@@ -1392,9 +1393,22 @@ const FOREST = [
     { key: 'plata',  emoji: '🌲', nombre: 'plata' },
     { key: 'bronce', emoji: '🌿', nombre: 'bronce' },
 ];
-// Con muchas cartas de una misma categoría la fila se haría eterna: se dibujan
-// las primeras y el resto se resume en un “+N”.
-const FOREST_MAX = 30;
+// El bosque cabe en tres líneas como mucho.
+const FOREST_LINEAS = 3;
+
+// Dibuja el bosque con los topes dados. Los <span> van pegados, sin espacios ni
+// saltos entre ellos, para que los árboles queden todos seguidos.
+function pintaBosque(cuenta, topes) {
+    let html = '';
+    for (const f of FOREST) {
+        const n = cuenta[f.key];
+        if (!n) continue;
+        const vistos = Math.min(n, topes[f.key]);
+        html += `<span class="f-${f.key}">${f.emoji.repeat(vistos)}</span>`;
+        if (n > vistos) html += `<span class="f-mas">+${n - vistos}</span>`;
+    }
+    histForest.innerHTML = `<div class="hf-rows">${html}</div>`;
+}
 
 function renderForest(entries) {
     const cuenta = { oro: 0, plata: 0, bronce: 0 };
@@ -1402,18 +1416,39 @@ function renderForest(entries) {
         const t = cardStats(v).tier.key;
         if (t in cuenta) cuenta[t]++;
     }
-    const piezas = [];
-    const leyenda = [];
-    for (const f of FOREST) {
-        const n = cuenta[f.key];
-        if (!n) continue;
-        piezas.push(`<span class="f-${f.key}">${f.emoji.repeat(Math.min(n, FOREST_MAX))}</span>`);
-        if (n > FOREST_MAX) piezas.push(`<span class="f-mas">+${n - FOREST_MAX}</span>`);
-        leyenda.push(`${n} de ${f.nombre}`);
+    const leyenda = FOREST.filter(f => cuenta[f.key]).map(f => `${cuenta[f.key]} de ${f.nombre}`);
+    if (!leyenda.length) { histForest.innerHTML = ''; histForest.removeAttribute('aria-label'); return; }
+
+    // Con la colección entera lo normal es que quepa; si no, se planta solo una
+    // parte, la misma proporción en las tres categorías, para que el bosque siga
+    // contando lo mismo: mucho arbusto y algún árbol grande suelto. Se busca la
+    // porción más grande que entra en las tres líneas probando y midiendo (hay
+    // que volver a pedir el div en cada vuelta: cada repintado sustituye el
+    // anterior), y lo que queda fuera se cuenta en el “+N”.
+    // Cuánto mide una línea no se puede dar por sabido: depende del emoji más
+    // alto que haya (el árbol grande abulta más que el arbusto), así que se
+    // planta uno solo y se mide. Cualquier bosque de tres líneas mide como mucho
+    // eso por tres, y uno de cuatro siempre pasa de ahí.
+    const alto = () => histForest.firstElementChild.scrollHeight;
+    const masAlto = FOREST.find(f => cuenta[f.key]).key;
+    pintaBosque({ [masAlto]: 1 }, { [masAlto]: 1 });
+    const maxAlto = alto() * FOREST_LINEAS;
+    const conEscala = e => Object.fromEntries(FOREST.map(f =>
+        [f.key, cuenta[f.key] ? Math.max(1, Math.round(cuenta[f.key] * e)) : 0]));
+    const cabe = e => {
+        pintaBosque(cuenta, conEscala(e));
+        return alto() <= maxAlto;
+    };
+    if (!cabe(1)) {
+        let malo = 1, bueno = 0;
+        for (let i = 0; i < 12; i++) {
+            const medio = (bueno + malo) / 2;
+            if (cabe(medio)) bueno = medio; else malo = medio;
+        }
+        pintaBosque(cuenta, conEscala(bueno));
     }
-    histForest.innerHTML = piezas.join('');
     // El bosque es decorativo, pero el recuento sí interesa a quien no lo ve.
-    histForest.setAttribute('aria-label', leyenda.length ? `Tu bosque: ${leyenda.join(', ')}.` : '');
+    histForest.setAttribute('aria-label', `Tu bosque: ${leyenda.join(', ')}.`);
 }
 
 function renderHistory() {
