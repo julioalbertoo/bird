@@ -226,6 +226,35 @@
         margin: 0;
     }
 
+    /* Bosque de la cabecera — un vistazo a la colección sin contar cartas: un
+       árbol grande por cada oro, uno más pequeño por cada plata y un arbusto por
+       cada bronce. Todo se apoya en la misma línea de suelo (align-items: flex-end)
+       para que las alturas se comparen de un golpe de vista. */
+    .hist-forest {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 2px 1px;
+        line-height: 1;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, .08);
+    }
+    .hist-forest:empty { display: none; }
+    .hist-forest span { display: inline-block; }
+    .f-oro    { font-size: 30px; }
+    .f-plata  { font-size: 20px; }
+    .f-bronce { font-size: 13px; }
+    /* Cuando hay tantas cartas de una categoría que no cabrían, se corta la fila
+       y el resto se cuenta con un “+N” discreto. */
+    .f-mas {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--subdued);
+        align-self: flex-end;
+        padding: 0 4px 2px 1px;
+    }
+
     /* Cartas tipo Ultimate Team — 3 por fila, ampliables al pulsarlas */
     .cards-grid {
         display: grid;
@@ -592,6 +621,7 @@
         <div class="hist-head">
             <h2 class="hist-title">Tu colección</h2>
         </div>
+        <div id="histForest" class="hist-forest" role="img"></div>
         <div id="historyBody" class="cards-grid"></div>
     </section>
 
@@ -629,6 +659,7 @@ const results = el('results');
 const resultsBody = el('resultsBody');
 const historySection = el('history');
 const historyBody = el('historyBody');
+const histForest = el('histForest');
 
 let birdNet = null;       // promise-based worker interface
 let busy = false;
@@ -1353,6 +1384,38 @@ async function pintarWiki(key, v) {
 // Fecha de la última escucha.
 function lastSeen(v) { return fmtDate(v.lastAt); }
 
+// Bosque de la cabecera. Cada carta con medalla planta algo: un árbol grande por
+// cada oro, uno más pequeño por cada plata y un arbusto por cada bronce. Las
+// cartas negras (sin zona) no plantan nada, igual que no llevan medalla.
+const FOREST = [
+    { key: 'oro',    emoji: '🌳', nombre: 'oro' },
+    { key: 'plata',  emoji: '🌲', nombre: 'plata' },
+    { key: 'bronce', emoji: '🌿', nombre: 'bronce' },
+];
+// Con muchas cartas de una misma categoría la fila se haría eterna: se dibujan
+// las primeras y el resto se resume en un “+N”.
+const FOREST_MAX = 30;
+
+function renderForest(entries) {
+    const cuenta = { oro: 0, plata: 0, bronce: 0 };
+    for (const [, v] of entries) {
+        const t = cardStats(v).tier.key;
+        if (t in cuenta) cuenta[t]++;
+    }
+    const piezas = [];
+    const leyenda = [];
+    for (const f of FOREST) {
+        const n = cuenta[f.key];
+        if (!n) continue;
+        piezas.push(`<span class="f-${f.key}">${f.emoji.repeat(Math.min(n, FOREST_MAX))}</span>`);
+        if (n > FOREST_MAX) piezas.push(`<span class="f-mas">+${n - FOREST_MAX}</span>`);
+        leyenda.push(`${n} de ${f.nombre}`);
+    }
+    histForest.innerHTML = piezas.join('');
+    // El bosque es decorativo, pero el recuento sí interesa a quien no lo ve.
+    histForest.setAttribute('aria-label', leyenda.length ? `Tu bosque: ${leyenda.join(', ')}.` : '');
+}
+
 function renderHistory() {
     const h = loadHistory();
     // Los sonidos que no son aves (coche, voz humana…) van al final de la colección;
@@ -1370,6 +1433,7 @@ function renderHistory() {
     });
     if (!entries.length) { historySection.hidden = true; return; }
     historySection.hidden = false;
+    renderForest(entries);
     historyBody.innerHTML = entries.map(([key, v]) => renderCard(key, v)).join('');
 }
 
