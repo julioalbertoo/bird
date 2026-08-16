@@ -1388,13 +1388,26 @@ function lastSeen(v) { return fmtDate(v.lastAt); }
 // Bosque de la cabecera. Cada carta con medalla planta algo: un árbol grande por
 // cada oro, uno más pequeño por cada plata y un arbusto por cada bronce. Las
 // cartas negras (sin zona) no plantan nada, igual que no llevan medalla.
+// El “+N” del final es solo para los bronces: son los que abundan y los que se
+// podan primero. Los oros y las platas se plantan enteros, sin cuenta a un lado.
 const FOREST = [
     { key: 'oro',    emoji: '🌳', nombre: 'oro' },
     { key: 'plata',  emoji: '🌲', nombre: 'plata' },
-    { key: 'bronce', emoji: '🌿', nombre: 'bronce' },
+    { key: 'bronce', emoji: '🌿', nombre: 'bronce', resto: true },
 ];
 // El bosque cabe en tres líneas como mucho.
 const FOREST_LINEAS = 3;
+
+// Mayor cantidad entre 0 y tope con la que `cabe` sigue diciendo que sí. Se
+// busca a tientas porque solo el navegador sabe cuánto ocupa lo pintado.
+function mayorQueCabe(tope, cabe) {
+    let bueno = 0, malo = tope + 1;
+    while (malo - bueno > 1) {
+        const medio = Math.floor((bueno + malo) / 2);
+        if (cabe(medio)) bueno = medio; else malo = medio;
+    }
+    return bueno;
+}
 
 // Dibuja el bosque con los topes dados. Los <span> van pegados, sin espacios ni
 // saltos entre ellos, para que los árboles queden todos seguidos.
@@ -1405,7 +1418,7 @@ function pintaBosque(cuenta, topes) {
         if (!n) continue;
         const vistos = Math.min(n, topes[f.key]);
         html += `<span class="f-${f.key}">${f.emoji.repeat(vistos)}</span>`;
-        if (n > vistos) html += `<span class="f-mas">+${n - vistos}</span>`;
+        if (f.resto && n > vistos) html += `<span class="f-mas">+${n - vistos}</span>`;
     }
     histForest.innerHTML = `<div class="hf-rows">${html}</div>`;
 }
@@ -1419,12 +1432,9 @@ function renderForest(entries) {
     const leyenda = FOREST.filter(f => cuenta[f.key]).map(f => `${cuenta[f.key]} de ${f.nombre}`);
     if (!leyenda.length) { histForest.innerHTML = ''; histForest.removeAttribute('aria-label'); return; }
 
-    // Con la colección entera lo normal es que quepa; si no, se planta solo una
-    // parte, la misma proporción en las tres categorías, para que el bosque siga
-    // contando lo mismo: mucho arbusto y algún árbol grande suelto. Se busca la
-    // porción más grande que entra en las tres líneas probando y midiendo (hay
-    // que volver a pedir el div en cada vuelta: cada repintado sustituye el
-    // anterior), y lo que queda fuera se cuenta en el “+N”.
+    // Con la colección entera lo normal es que quepa; si no, se poda hasta que
+    // entre en las tres líneas, probando y midiendo lo pintado (hay que volver a
+    // pedir el div en cada vuelta: cada repintado sustituye el anterior).
     // Cuánto mide una línea no se puede dar por sabido: depende del emoji más
     // alto que haya (el árbol grande abulta más que el arbusto), así que se
     // planta uno solo y se mide. Cualquier bosque de tres líneas mide como mucho
@@ -1433,19 +1443,19 @@ function renderForest(entries) {
     const masAlto = FOREST.find(f => cuenta[f.key]).key;
     pintaBosque({ [masAlto]: 1 }, { [masAlto]: 1 });
     const maxAlto = alto() * FOREST_LINEAS;
-    const conEscala = e => Object.fromEntries(FOREST.map(f =>
-        [f.key, cuenta[f.key] ? Math.max(1, Math.round(cuenta[f.key] * e)) : 0]));
-    const cabe = e => {
-        pintaBosque(cuenta, conEscala(e));
-        return alto() <= maxAlto;
-    };
-    if (!cabe(1)) {
-        let malo = 1, bueno = 0;
-        for (let i = 0; i < 12; i++) {
-            const medio = (bueno + malo) / 2;
-            if (cabe(medio)) bueno = medio; else malo = medio;
-        }
-        pintaBosque(cuenta, conEscala(bueno));
+    const topes = { ...cuenta };
+    const cabe = () => { pintaBosque(cuenta, topes); return alto() <= maxAlto; };
+    if (!cabe()) {
+        // Se planta el mismo porcentaje de las tres categorías, para que el
+        // bosque sea el de siempre en pequeño: mucho arbusto y algún árbol
+        // grande suelto. Solo el bronce dice cuánto se ha quedado sin plantar;
+        // en oros y platas no hay nada que apuntar, la colección entera está en
+        // las cartas de debajo.
+        const porcion = pc => {
+            for (const f of FOREST) topes[f.key] = cuenta[f.key] ? Math.max(1, Math.round(cuenta[f.key] * pc / 100)) : 0;
+        };
+        porcion(mayorQueCabe(100, pc => { porcion(pc); return cabe(); }));
+        pintaBosque(cuenta, topes);
     }
     // El bosque es decorativo, pero el recuento sí interesa a quien no lo ve.
     histForest.setAttribute('aria-label', `Tu bosque: ${leyenda.join(', ')}.`);
