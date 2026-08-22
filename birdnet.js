@@ -118,7 +118,29 @@ async function main() {
         'Dog', 'Engine', 'Environmental', 'Fireworks', 'Gun', 'Human non-vocal',
         'Human vocal', 'Human whistle', 'Noise', 'Power tools', 'Siren',
     ])
-    const esperable = bird => bird.geoscore > MIN_AREA_CONFIDENCE
+    // Especies asilvestradas: crían aquí, pero el modelo geográfico de BirdNET
+    // aprende de datos de observación que reflejan sobre todo el área de
+    // distribución nativa, así que a las poblaciones introducidas les da una
+    // frecuencia ridícula y el filtro las borraba. La cotorra argentina en
+    // Madrid saca 0.004 en agosto y 0.997 en Buenos Aires; la de Kramer no
+    // llega al umbral ninguna semana del año pese a haber miles en la ciudad.
+    // Igual que los sonidos que no son aves, estas no se filtran por zona: el
+    // umbral de audio sigue siendo el que decide.
+    const ASILVESTRADAS = new Set([
+        'Acridotheres tristis',    // miná común
+        'Alopochen aegyptiaca',    // ganso del Nilo
+        'Amandava amandava',       // bengalí rojo
+        'Estrilda astrild',        // estrilda común / pico de coral
+        'Euplectes afer',          // obispo coronigualdo
+        'Leiothrix lutea',         // leiótrix piquirrojo / ruiseñor del Japón
+        'Myiopsitta monachus',     // cotorra argentina
+        'Ploceus melanocephalus',  // tejedor cabecinegro
+        'Psittacula eupatria',     // cotorra alejandrina
+        'Psittacula krameri',      // cotorra de Kramer
+    ])
+    // Cuenta como esperable en tu zona (y por tanto suma al contador de la UI)
+    // lo que diga el modelo geográfico, más las asilvestradas.
+    const esperable = bird => bird.geoscore > MIN_AREA_CONFIDENCE || ASILVESTRADAS.has(bird.sciName)
     const enZona = bird => SIN_ZONA.has(bird.sciName) || esperable(bird)
 }
 

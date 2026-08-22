@@ -42,6 +42,24 @@ Dos detalles del modelo geográfico: parte el año en **48 semanas** (4 por mes,
 no 52), y no sabe nada de los sonidos que no son aves (perro, sirena, voz…), así
 que esos nunca se filtran por zona.
 
+### Las cotorras y demás especies asilvestradas
+
+El modelo geográfico aprende de datos de observación que reflejan sobre todo el
+**área de distribución nativa** de cada ave, así que a las poblaciones
+introducidas les asigna una frecuencia ridícula aunque estén por todas partes.
+La **cotorra argentina** en Madrid saca `0.004` en agosto (frente a `0.997` en
+Buenos Aires) y solo supera el umbral entre diciembre y primeros de febrero; la
+**cotorra de Kramer** no lo supera **ninguna** semana del año. Resultado: el
+filtro las borraba antes de mirar siquiera lo que había oído el micrófono.
+
+Por eso hay en `birdnet.js` una lista corta, `ASILVESTRADAS`, con especies que
+crían aquí pero que el modelo geográfico no reconoce como locales (las dos
+cotorras, la alejandrina, el miná, el ganso del Nilo, el bengalí rojo, la
+estrilda, el obispo, el leiótrix y el tejedor cabecinegro). Igual que los
+sonidos que no son aves, **no se filtran por zona**: para ellas manda solo el
+umbral de audio. Si te falta alguna, basta con añadir su nombre científico —tal
+como aparece en `models/birdnet/labels/en_us.txt`— a ese `Set`.
+
 ## ¿Con qué confianza se considera un acierto?
 
 BirdNET no da un sí/no, sino una **confianza de 0 a 1** (0 %–100 %) para cada
@@ -51,7 +69,7 @@ en `birdnet.js`:
 | Constante | Valor | Qué hace |
 |-----------|-------|----------|
 | `MIN_AUDIO_CONFIDENCE` | `0.03` (**3 %**) | Confianza mínima para que una especie cuente como detección. Por debajo se descarta como ruido. |
-| `MIN_AREA_CONFIDENCE` | `0.03` (**3 %**) | Umbral geográfico: frecuencia mínima con la que la especie aparece en tu zona y semana para que se tenga en cuenta. Es el valor por defecto de BirdNET (`--sf_thresh`). |
+| `MIN_AREA_CONFIDENCE` | `0.03` (**3 %**) | Umbral geográfico: frecuencia mínima con la que la especie aparece en tu zona y semana para que se tenga en cuenta. Es el valor por defecto de BirdNET (`--sf_thresh`). Las especies de `ASILVESTRADAS` se lo saltan. |
 
 Es decir: **a partir del 3 % una especie ya se considera un acierto** y aparece
 en la lista. Es un umbral deliberadamente bajo (BirdNET reparte la probabilidad
@@ -62,7 +80,9 @@ probabilidad de que sea "la correcta".
 Puedes hacerlo más estricto subiendo `MIN_AUDIO_CONFIDENCE` (por ejemplo `0.1`
 para pedir al menos un 10 %) o afinar el filtro de zona con
 `MIN_AREA_CONFIDENCE`: subirlo deja fuera a las especies poco frecuentes de tu
-área, bajarlo permite que aparezcan rarezas y aves de paso.
+área, bajarlo permite que aparezcan rarezas y aves de paso. Para colar una
+especie concreta que el modelo geográfico no ubica bien, es mejor añadirla a
+`ASILVESTRADAS` que bajar el umbral a todo el mundo.
 
 ## ¿Y si escucha varias aves (o varios sonidos)?
 
