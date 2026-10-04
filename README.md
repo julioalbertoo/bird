@@ -181,14 +181,35 @@ categoría.
   son aves** (motor, voz humana, ruido…) siempre al final.
 - Cada especie luce el **icono de su grupo** (ver abajo), y los sonidos que no son
   aves el suyo: 🐕 perro, 🚗 motor, 🗣️ voz…
-- Se guarda **localmente en tu dispositivo** (`localStorage`), no se sube a
-  ningún sitio y persiste entre visitas.
+- Se guarda **localmente en tu dispositivo** (`localStorage`) y persiste entre
+  visitas aunque no inicies sesión.
 - Cada grabación suma **+1** por especie/sonido mostrado; si algo aparece varias
   veces en la misma grabación solo cuenta una vez.
 - Las entradas guardadas antes de que se registraran confianzas no tienen datos:
   su carta muestra `—` y se queda en bronce hasta que vuelvas a escucharlas. Lo
   mismo con la fecha y el sitio del `MÁX`: no se muestran hasta que batas esa
   marca con una escucha nueva.
+
+## Guardar la colección en la nube (opcional)
+
+Encima de la colección hay una barra para iniciar sesión con **enlace mágico**
+(solo el email, sin contraseña): se envía un enlace a tu correo y al pulsarlo
+entras. No es obligatorio: sin iniciar sesión la app funciona igual que
+siempre, solo con `localStorage`.
+
+Si inicias sesión, cada especie nueva o actualizada se sube a una tabla propia
+(`bird.discoveries`) en Supabase, asociada a tu usuario mediante
+RLS (cada cuenta solo puede leer o escribir sus propias filas). Al iniciar
+sesión en otro dispositivo, esa colección se descarga y se combina con la
+local: por cada especie se queda la mejor carta de las dos (la que tiene zona,
+luego la de mayor valoración), no una suma de ambas.
+
+`localStorage` sigue siendo quien pinta la colección en pantalla; la nube es
+solo una copia de seguridad ligada a tu cuenta, para no perder el progreso ni
+depender de un solo dispositivo. El audio sigue sin salir nunca del
+navegador: lo único que viaja a la nube son los nombres de especie, las
+confianzas y, si diste permiso de ubicación, las coordenadas del mejor
+acierto — igual que ya se guardaba todo eso localmente.
 
 ## Los iconos: uno por grupo de especie
 
@@ -247,8 +268,9 @@ así que también sirve bajo un subdirectorio como `usuario.github.io/bird/`).
 
 ## Estructura
 
-- `index.html` — interfaz y flujo de grabación/análisis.
+- `index.html` — interfaz, flujo de grabación/análisis y sincronización con Supabase.
 - `birdnet.js` — worker de inferencia (capa MelSpec + kernel STFT en WebGL/WebGPU).
+- `vendor/supabase.min.js` — cliente de Supabase incluido localmente (sin CDN), para el login y la copia en la nube de la colección.
 - `vendor/tf.min.js` — TensorFlow.js incluido localmente (sin CDN).
 - `models/birdnet/` — modelo BirdNET, modelo geográfico y etiquetas (es / científico).
 

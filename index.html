@@ -582,6 +582,56 @@
         color: var(--track);
         font-variant-numeric: tabular-nums;
     }
+
+    /* ---- Cuenta: guardar la colección en la nube (Supabase) ---- */
+    .account-bar {
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+    .account-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+    .account-text { color: var(--subdued); }
+    .account-text strong { color: var(--text); }
+    .login-form {
+        display: flex;
+        gap: 8px;
+        flex: 1 1 220px;
+        min-width: 0;
+    }
+    .login-form input {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: var(--surface-3);
+        border: 1px solid var(--track);
+        border-radius: 999px;
+        padding: 7px 14px;
+        color: var(--text);
+        font-size: 13px;
+    }
+    .login-form input:focus { outline: 2px solid var(--green); }
+    .login-form button, .logout-btn {
+        background: var(--green);
+        color: #000;
+        border: none;
+        border-radius: 999px;
+        padding: 7px 16px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .login-form button:disabled { opacity: .6; cursor: default; }
+    .logout-btn { background: transparent; color: var(--subdued); border: 1px solid var(--track); }
+    .logout-btn:hover { color: var(--text); border-color: var(--subdued); }
+    .account-msg { width: 100%; margin: 6px 0 0; color: var(--green); }
+    .account-msg.err { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -591,6 +641,21 @@
         <h1>🐦 ¿Qué pájaro es?</h1>
         <p class="tagline">Escucha 10 segundos con tu micrófono y te digo qué ave suena.</p>
     </header>
+
+    <section id="account" class="account-bar">
+        <div id="accountLoggedOut" class="account-row">
+            <span class="account-text">Guarda tu colección en la nube e inicia sesión en cualquier dispositivo.</span>
+            <form id="loginForm" class="login-form">
+                <input id="loginEmail" type="email" placeholder="tu@email.com" required autocomplete="email">
+                <button type="submit" id="loginBtn">Enviar enlace</button>
+            </form>
+            <p id="loginMsg" class="account-msg" hidden></p>
+        </div>
+        <div id="accountLoggedIn" class="account-row" hidden>
+            <span class="account-text">Conectado como <strong id="accountEmail"></strong> · tu colección se guarda en la nube.</span>
+            <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
+        </div>
+    </section>
 
     <main class="card">
         <button id="recordBtn" class="record-btn" disabled>
@@ -640,6 +705,7 @@
     </footer>
 </div>
 
+<script src="vendor/supabase.min.js"></script>
 <script>
 const SAMPLE_RATE = 48000;
 const CHUNK_3S = 144000;      // 3 s at 48 kHz — the window BirdNET expects
@@ -661,6 +727,14 @@ const resultsBody = el('resultsBody');
 const historySection = el('history');
 const historyBody = el('historyBody');
 const histForest = el('histForest');
+const loginForm = el('loginForm');
+const loginEmail = el('loginEmail');
+const loginBtn = el('loginBtn');
+const loginMsg = el('loginMsg');
+const logoutBtn = el('logoutBtn');
+const accountLoggedOut = el('accountLoggedOut');
+const accountLoggedIn = el('accountLoggedIn');
+const accountEmail = el('accountEmail');
 
 let birdNet = null;       // promise-based worker interface
 let busy = false;
@@ -1129,7 +1203,119 @@ function addToHistory(items) {
     }
     saveHistory(h);
     renderHistory();
+    syncPush(h, seen);
 }
+
+// ---- Cuenta y nube: guardar la colección en Supabase (schema "bird") ----
+// localStorage sigue siendo la fuente de verdad para pintar la colección; la
+// nube es solo una copia ligada a tu cuenta, para no perderla ni compartirla
+// entre dispositivos. Claves públicas: están pensadas para usarse así, desde
+// el navegador (la seguridad real la pone RLS en la base de datos).
+const SUPABASE_URL = 'https://lmfdpetsqmmymbuwbziw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EjbC1Y2umbq66ZS-ohAu8g_-BlYQHOd';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'bird' } });
+
+function showLoginMsg(text, isErr) {
+    loginMsg.textContent = text;
+    loginMsg.hidden = !text;
+    loginMsg.classList.toggle('err', !!isErr);
+}
+
+function renderAccount(session) {
+    const logged = !!session;
+    accountLoggedOut.hidden = logged;
+    accountLoggedIn.hidden = !logged;
+    if (logged) accountEmail.textContent = session.user.email || '';
+}
+
+// Convierte una fila de bird.discoveries en una entrada del historial local.
+function rowToEntry(row) {
+    return {
+        count: row.count || 0,
+        confs: Array.isArray(row.confs) ? row.confs : [],
+        confsZona: Array.isArray(row.confs_zona) ? row.confs_zona : [],
+        best: row.best_conf == null ? undefined : { conf: row.best_conf, at: row.best_at, lat: row.best_lat, lon: row.best_lon },
+        lastAt: row.last_at || 0,
+        conZona: !!row.con_zona,
+        label: row.label, emoji: row.emoji, sci: row.sci, isBird: row.is_bird,
+    };
+}
+
+// Convierte una entrada local en la fila que se guarda en bird.discoveries.
+function entryToRow(userId, key, v) {
+    return {
+        user_id: userId, species_key: key,
+        label: v.label, emoji: v.emoji, sci: v.sci || '', is_bird: !!v.isBird,
+        count: v.count || 0,
+        confs: v.confs || [], confs_zona: v.confsZona || [],
+        con_zona: v.conZona === true,
+        best_conf: v.best ? v.best.conf : null,
+        best_at: v.best ? v.best.at : null,
+        best_lat: v.best && typeof v.best.lat === 'number' ? v.best.lat : null,
+        best_lon: v.best && typeof v.best.lon === 'number' ? v.best.lon : null,
+        last_at: v.lastAt || null,
+        updated_at: new Date().toISOString(),
+    };
+}
+
+// Entre dos versiones de la misma especie (local vs. nube), se queda entera la
+// mejor carta (misma prioridad que la colección: con zona > valoración > veces
+// escuchada), para no mezclar arrays de dos dispositivos y descontar cosas por
+// duplicado. Solo la fecha de "última vez escuchada" se toma la más reciente.
+function mejorEntrada(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const ra = cardStats(a), rb = cardStats(b);
+    const ganaA = (ra.conZona !== rb.conZona) ? ra.conZona
+        : (ra.rating !== rb.rating) ? ra.rating > rb.rating
+        : (a.count || 0) >= (b.count || 0);
+    const ganadora = ganaA ? a : b;
+    return { ...ganadora, lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) };
+}
+
+async function pullAndMerge(userId) {
+    const { data, error } = await sb.from('discoveries').select('*').eq('user_id', userId);
+    if (error) { console.error(error); return; }
+    if (!data || !data.length) return;
+    const h = loadHistory();
+    for (const row of data) h[row.species_key] = mejorEntrada(h[row.species_key], rowToEntry(row));
+    saveHistory(h);
+    renderHistory();
+}
+
+async function syncPush(h, keys) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session || !keys || !keys.size) return;
+    const rows = [...keys].filter(k => h[k]).map(k => entryToRow(session.user.id, k, h[k]));
+    if (!rows.length) return;
+    const { error } = await sb.from('discoveries').upsert(rows, { onConflict: 'user_id,species_key' });
+    if (error) console.error(error);
+}
+
+function initAccount() {
+    sb.auth.onAuthStateChange((event, session) => {
+        renderAccount(session);
+        if (event === 'SIGNED_IN' && session) pullAndMerge(session.user.id);
+    });
+    sb.auth.getSession().then(({ data: { session } }) => {
+        renderAccount(session);
+        if (session) pullAndMerge(session.user.id);
+    });
+}
+
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginBtn.disabled = true;
+    showLoginMsg('Enviando enlace…');
+    const { error } = await sb.auth.signInWithOtp({
+        email: loginEmail.value.trim(),
+        options: { emailRedirectTo: location.origin + location.pathname },
+    });
+    loginBtn.disabled = false;
+    showLoginMsg(error ? 'No se ha podido enviar el enlace: ' + error.message : 'Revisa tu correo y pulsa el enlace para entrar.', !!error);
+});
+
+logoutBtn.addEventListener('click', () => sb.auth.signOut());
 
 // ---- Cartas tipo Ultimate Team ----
 // El mejor acierto de cada especie es la valoración de su carta, y esa
@@ -1539,6 +1725,7 @@ recordBtn.addEventListener('click', run);
 (async function init() {
     migrarZona();
     renderHistory();
+    initAccount();
     try {
         setBar(0);
         showBar(true);
