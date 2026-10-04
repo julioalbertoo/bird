@@ -1273,33 +1273,41 @@ function mejorEntrada(a, b) {
     return { ...ganadora, lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) };
 }
 
-async function pullAndMerge(userId) {
-    const { data, error } = await sb.from('discoveries').select('*').eq('user_id', userId);
-    if (error) { console.error(error); return; }
-    if (!data || !data.length) return;
-    const h = loadHistory();
-    for (const row of data) h[row.species_key] = mejorEntrada(h[row.species_key], rowToEntry(row));
-    saveHistory(h);
-    renderHistory();
-}
-
-async function syncPush(h, keys) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session || !keys || !keys.size) return;
-    const rows = [...keys].filter(k => h[k]).map(k => entryToRow(session.user.id, k, h[k]));
+async function upsertRows(rows) {
     if (!rows.length) return;
     const { error } = await sb.from('discoveries').upsert(rows, { onConflict: 'user_id,species_key' });
     if (error) console.error(error);
 }
 
+// Al iniciar sesión: baja lo que ya hubiera en la nube, lo combina con lo que
+// había en localStorage (quedándose con la mejor carta de cada especie) y
+// sube TODO ese resultado — así lo que llevabas descubierto sin loguearte
+// (incluido antes de que existiera esta cuenta) también queda guardado en la
+// base de datos, no solo lo que descubras de ahora en adelante.
+async function syncOnLogin(userId) {
+    const { data, error } = await sb.from('discoveries').select('*').eq('user_id', userId);
+    if (error) { console.error(error); return; }
+    const h = loadHistory();
+    for (const row of (data || [])) h[row.species_key] = mejorEntrada(h[row.species_key], rowToEntry(row));
+    saveHistory(h);
+    renderHistory();
+    await upsertRows(Object.keys(h).map(k => entryToRow(userId, k, h[k])));
+}
+
+async function syncPush(h, keys) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session || !keys || !keys.size) return;
+    await upsertRows([...keys].filter(k => h[k]).map(k => entryToRow(session.user.id, k, h[k])));
+}
+
 function initAccount() {
     sb.auth.onAuthStateChange((event, session) => {
         renderAccount(session);
-        if (event === 'SIGNED_IN' && session) pullAndMerge(session.user.id);
+        if (event === 'SIGNED_IN' && session) syncOnLogin(session.user.id);
     });
     sb.auth.getSession().then(({ data: { session } }) => {
         renderAccount(session);
-        if (session) pullAndMerge(session.user.id);
+        if (session) syncOnLogin(session.user.id);
     });
 }
 
