@@ -642,21 +642,6 @@
         <p class="tagline">Escucha 10 segundos con tu micrófono y te digo qué ave suena.</p>
     </header>
 
-    <section id="account" class="account-bar">
-        <div id="accountLoggedOut" class="account-row">
-            <span class="account-text">Guarda tu colección en la nube e inicia sesión en cualquier dispositivo.</span>
-            <form id="loginForm" class="login-form">
-                <input id="loginEmail" type="email" placeholder="tu@email.com" required autocomplete="email">
-                <button type="submit" id="loginBtn">Enviar enlace</button>
-            </form>
-            <p id="loginMsg" class="account-msg" hidden></p>
-        </div>
-        <div id="accountLoggedIn" class="account-row" hidden>
-            <span class="account-text">Conectado como <strong id="accountEmail"></strong> · tu colección se guarda en la nube.</span>
-            <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
-        </div>
-    </section>
-
     <main class="card">
         <button id="recordBtn" class="record-btn" disabled>
             <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -682,6 +667,21 @@
             <div id="resultsBody"></div>
         </div>
     </main>
+
+    <section id="account" class="account-bar">
+        <div id="accountLoggedOut" class="account-row">
+            <span class="account-text">Guarda tu colección en la nube e inicia sesión en cualquier dispositivo.</span>
+            <form id="loginForm" class="login-form">
+                <input id="loginEmail" type="email" placeholder="tu@email.com" required autocomplete="email">
+                <button type="submit" id="loginBtn">Enviar enlace</button>
+            </form>
+            <p id="loginMsg" class="account-msg" hidden></p>
+        </div>
+        <div id="accountLoggedIn" class="account-row" hidden>
+            <span class="account-text">Conectado como <strong id="accountEmail"></strong> · tu colección se guarda en la nube.</span>
+            <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
+        </div>
+    </section>
 
     <section id="history" class="history-card" hidden>
         <div class="hist-head">
