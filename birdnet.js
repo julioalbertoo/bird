@@ -40,16 +40,32 @@ async function isModelCached() {
     return !!(cache && await cache.match('models/birdnet/model.json'))
 }
 
-main()
+// Si algo falla al cargar, la página tiene que enterarse: un error dentro de
+// una promesa no dispara el evento 'error' del worker y la barra se quedaba
+// congelada para siempre.
+// La página puede pedir el modo CPU (?backend=cpu) cuando la tarjeta gráfica
+// falló o tardó demasiado en un intento anterior.
+const FORZAR_CPU = new URLSearchParams(self.location.search).get('backend') === 'cpu'
+
+main().catch(e => postMessage({ message: 'load_error', error: (e && e.message) || String(e) }))
+
+async function elegirBackend() {
+    if (!FORZAR_CPU) {
+        try { if (await tf.setBackend('webgl')) return 'webgl' }
+        catch (_) { /* sin WebGL en el worker: seguimos en CPU */ }
+    }
+    await tf.setBackend('cpu')
+    return 'cpu'
+}
+
 async function main() {
-    await tf.setBackend('webgl')
-    postMessage({ message: 'cache_status', cached: await isModelCached() })
+    let backend = await elegirBackend()
+    postMessage({ message: 'cache_status', cached: await isModelCached(), backend })
     postMessage({ message: 'load_model' })
-    const BirdNetJS = await predictModel()
-    postMessage({ message: 'warmup' })
-    await BirdNetJS.warmup()
+    let BirdNetJS = await predictModel()
     postMessage({ message: 'load_geomodel' })
-    const areaModel = await tf.loadGraphModel('models/birdnet/area-model/model.json', { fetchFunc: cachedFetch })
+    const cargarAreaModel = () => tf.loadGraphModel('models/birdnet/area-model/model.json', { fetchFunc: cachedFetch })
+    let areaModel = await cargarAreaModel()
     postMessage({ message: 'load_labels' })
     // en_us.txt gives "Scientific_English name"; es.txt gives "Scientific_Nombre en español".
     const birdsSci = (await cachedFetch('models/birdnet/labels/en_us.txt').then(r => r.text())).split('\n')
@@ -65,6 +81,25 @@ async function main() {
             name: ((birdsEs[i] || '').split('_')[1] || birdsSci[i].split('_')[1] || '').trim(),
         }
     }
+    // El calentamiento va al final: es la primera predicción, la que obliga a
+    // preparar todos los cálculos en la tarjeta gráfica. En iPhone puede tardar
+    // bastante y no tiene progreso que contar, así que la página anima la barra.
+    postMessage({ message: 'warmup', backend })
+    try {
+        await BirdNetJS.warmup()
+    } catch (e) {
+        if (backend === 'cpu') throw e
+        // La tarjeta gráfica falló (falta de memoria, contexto WebGL perdido…):
+        // se recarga el modelo en CPU, que es más lento pero no depende de ella.
+        // Los pesos ya están en la caché, así que la recarga no descarga nada.
+        console.warn('WebGL falló en el calentamiento, paso a CPU:', e)
+        await tf.setBackend('cpu')
+        backend = 'cpu'
+        postMessage({ message: 'warmup', backend, fallback: true })
+        BirdNetJS = await predictModel()
+        areaModel = await cargarAreaModel()
+        await BirdNetJS.warmup()
+    }
     postMessage({ message: 'loaded' })
     const MIN_AUDIO_CONFIDENCE = 0.03
     // Frecuencia mínima de aparición de la especie en tu zona y semana para que
@@ -77,7 +112,13 @@ async function main() {
 
     onmessage = async function({ data }) {
         if (data.message === 'predict') {
-            const predictionList = await BirdNetJS.predict(tf.tensor(data.pcmAudio, [data.pcmAudio.length / 144000, 144000]))
+            let predictionList
+            try {
+                predictionList = await BirdNetJS.predict(tf.tensor(data.pcmAudio, [data.pcmAudio.length / 144000, 144000]))
+            } catch (e) {
+                postMessage({ message: 'predict', prediction: [], error: (e && e.message) || String(e) })
+                return
+            }
             const prediction = []
             for (let batch = 0; batch < predictionList.length; batch++) {
                 for (let i = 0; i < predictionList[batch].length; i++) {
@@ -199,7 +240,7 @@ class MelSpecLayerSimple extends tf.layers.Layer {
                 spec = tf.div(spec, tf.max(spec, -1, true).add(0.000001))
                 spec = tf.sub(spec, 0.5)
                 spec = tf.mul(spec, 2.0)
-                spec = tf.engine().runKernel('STFT', { signal: spec, frameLength: this.frameLength, frameStep: this.frameStep })
+                spec = stft(spec, this.frameLength, this.frameStep)
                 spec = tf.matMul(spec, this.melFilterbank)
                 spec = spec.pow(2.0)
                 spec = spec.pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
@@ -213,6 +254,59 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     static get className() { return 'MelSpecLayerSimple' }
 }
 tf.serialization.registerClass(MelSpecLayerSimple)
+
+// En la tarjeta gráfica el espectrograma lo calculan los kernels STFT de abajo.
+// En CPU no existen, así que se calcula aquí en JavaScript lo mismo: ventana de
+// Hann periódica, FFT y parte real. La FFT de TensorFlow.js en CPU es unas 100
+// veces más lenta que esta (33 s frente a décimas por fragmento de 3 s).
+function stft(signal, frameLength, frameStep) {
+    const backend = tf.getBackend()
+    if (backend === 'webgl' || backend === 'webgpu') {
+        return tf.engine().runKernel('STFT', { signal, frameLength, frameStep })
+    }
+    const x = signal.dataSync()
+    const batch = Math.floor((x.length - frameLength) / frameStep) + 1
+    const bins = frameLength / 2 + 1
+    const out = new Float32Array(batch * bins)
+    const { hann, cos, sin, rev } = tablasFFT(frameLength)
+    const re = new Float64Array(frameLength), im = new Float64Array(frameLength)
+    for (let f = 0; f < batch; f++) {
+        const base = f * frameStep
+        // Se copian las muestras ya enventanadas en orden de bits invertidos.
+        for (let i = 0; i < frameLength; i++) { re[rev[i]] = x[base + i] * hann[i]; im[rev[i]] = 0 }
+        // FFT iterativa radix-2 (Cooley-Tukey).
+        for (let len = 2; len <= frameLength; len *= 2) {
+            const half = len / 2, paso = frameLength / len
+            for (let i = 0; i < frameLength; i += len) {
+                for (let j = 0; j < half; j++) {
+                    const c = cos[j * paso], s = sin[j * paso]
+                    const a = i + j, b = a + half
+                    const tr = re[b] * c - im[b] * s
+                    const ti = re[b] * s + im[b] * c
+                    re[b] = re[a] - tr; im[b] = im[a] - ti
+                    re[a] += tr; im[a] += ti
+                }
+            }
+        }
+        out.set(re.subarray(0, bins), f * bins)
+    }
+    return tf.tensor2d(out, [batch, bins])
+}
+
+const cacheTablasFFT = {}
+function tablasFFT(n) {
+    if (cacheTablasFFT[n]) return cacheTablasFFT[n]
+    const hann = new Float64Array(n), cos = new Float64Array(n / 2), sin = new Float64Array(n / 2), rev = new Uint32Array(n)
+    const bits = Math.log2(n)
+    for (let i = 0; i < n; i++) {
+        hann[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / n)
+        let r = 0
+        for (let b = 0; b < bits; b++) if (i & (1 << b)) r |= 1 << (bits - 1 - b)
+        rev[i] = r
+    }
+    for (let k = 0; k < n / 2; k++) { cos[k] = Math.cos(-2 * Math.PI * k / n); sin[k] = Math.sin(-2 * Math.PI * k / n) }
+    return (cacheTablasFFT[n] = { hann, cos, sin, rev })
+}
 
 tf.registerKernel({
     kernelName: 'STFT',

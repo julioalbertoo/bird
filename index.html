@@ -751,8 +751,28 @@ function setBar(pct) {
 }
 
 // ---- Load the BirdNET worker (model + labels) ----
+// Si la tarjeta gráfica falla o se cuelga al calentar el modelo, se recuerda
+// para cargar directamente en modo CPU (más compatible) las siguientes veces.
+const CPU_KEY = 'birdnet-forzar-cpu';
+function forzarCpu() { try { return localStorage.getItem(CPU_KEY) === '1'; } catch (_) { return false; } }
+function recordarCpu() { try { localStorage.setItem(CPU_KEY, '1'); } catch (_) { /* modo privado */ } }
+
+// Tiempo máximo sin noticias del worker. El calentamiento en la tarjeta gráfica
+// bloquea el worker mientras compila; si se pasa de esto, se da por colgado.
+const WARMUP_TIMEOUT_MS = 45000;
+const WARMUP_CPU_TIMEOUT_MS = 90000; // en CPU no hay plan B: se le da más margen
+const STALL_TIMEOUT_MS = 120000; // descargas lentas: un trozo de ~5 MB por mensaje
+
 function loadBirdNet() {
-    const worker = new Worker('birdnet.js');
+    return cargarWorker(forzarCpu()).catch(e => {
+        // Colgado o fallo en la tarjeta gráfica: un segundo intento en CPU.
+        if (e.reintentarEnCpu) { recordarCpu(); return cargarWorker(true); }
+        throw e;
+    });
+}
+
+function cargarWorker(cpu) {
+    const worker = new Worker('birdnet.js' + (cpu ? '?backend=cpu' : ''));
     function call(data) {
         worker.postMessage(data);
         return new Promise(resolve => {
@@ -767,27 +787,89 @@ function loadBirdNet() {
     }
     return new Promise((resolve, reject) => {
         let fromCache = false;
+        let backend = cpu ? 'cpu' : 'webgl';
+        let calentando = false;
+        let animacion = null;
+        let vigilante = null;
+        let pct = 0;
+        let hecho = false;
+
+        function terminar() {
+            hecho = true;
+            clearTimeout(vigilante);
+            clearInterval(animacion);
+            worker.removeEventListener('message', onLoading);
+        }
+        function fallar(err) {
+            terminar();
+            worker.terminate();
+            reject(err);
+        }
+        function vigilar() {
+            clearTimeout(vigilante);
+            const ms = !calentando ? STALL_TIMEOUT_MS
+                : backend === 'cpu' ? WARMUP_CPU_TIMEOUT_MS : WARMUP_TIMEOUT_MS;
+            vigilante = setTimeout(() => {
+                const err = new Error(calentando
+                    ? 'El modelo tardó demasiado en prepararse.'
+                    : 'La carga del modelo se ha quedado parada. Revisa la conexión.');
+                err.reintentarEnCpu = calentando && backend !== 'cpu';
+                fallar(err);
+            }, ms);
+        }
+        // Durante el calentamiento no hay nada que contar: la barra avanza sola
+        // cada vez más despacio, sin llegar nunca al final, para que se vea que
+        // la app sigue trabajando.
+        function animarCalentamiento() {
+            clearInterval(animacion);
+            animacion = setInterval(() => { pct += (98 - pct) * 0.04; setBar(pct); }, 250);
+        }
+
         function onLoading({ data }) {
-            // Cada petición completada (modelo, shards, etiquetas…) avanza la barra.
-            if (data.message === 'fetch_progress') { setBar(data.done / data.total * 95); return; }
-            if (data.message === 'cache_status') { fromCache = !!data.cached; return; }
+            vigilar();
+            // Cada petición completada (modelo, shards, etiquetas…) avanza la barra
+            // hasta el 80 %; el último 20 % es el calentamiento.
+            if (data.message === 'fetch_progress') {
+                if (!calentando) { pct = data.done / data.total * 80; setBar(pct); }
+                return;
+            }
+            if (data.message === 'cache_status') {
+                fromCache = !!data.cached;
+                if (data.backend) backend = data.backend;
+                return;
+            }
+            if (data.message === 'load_error') {
+                fallar(new Error(data.error));
+                return;
+            }
+            if (data.message === 'warmup') {
+                calentando = true;
+                if (data.backend) backend = data.backend;
+                if (data.fallback) recordarCpu();
+                setStatus(data.fallback
+                    ? 'La tarjeta gráfica falló; preparando el modo compatible…'
+                    : 'Preparando el modelo (puede tardar un poco la primera vez)…');
+                animarCalentamiento();
+                vigilar();
+                return;
+            }
             const labels = {
                 load_model: fromCache
                     ? 'Cargando el modelo desde la caché de tu dispositivo…'
                     : 'Descargando el modelo BirdNET (~60 MB, solo la primera vez)…',
-                warmup: 'Calentando el modelo…',
                 load_geomodel: 'Cargando modelo geográfico…',
                 load_labels: 'Cargando nombres de especies…',
             };
             if (labels[data.message]) setStatus(labels[data.message]);
             if (data.message === 'loaded') {
+                terminar();
                 setBar(100);
-                worker.removeEventListener('message', onLoading);
                 resolve(call);
             }
         }
         worker.addEventListener('message', onLoading);
-        worker.addEventListener('error', e => reject(new Error('Error cargando el worker: ' + e.message)));
+        worker.addEventListener('error', e => { if (!hecho) fallar(new Error('Error cargando el worker: ' + e.message)); });
+        vigilar();
     });
 }
 
@@ -947,7 +1029,8 @@ async function identify(pcm) {
             padded.set(chunk, 0);
             chunk = padded;
         }
-        const { prediction } = await birdNet({ message: 'predict', pcmAudio: chunk });
+        const { prediction, error } = await birdNet({ message: 'predict', pcmAudio: chunk });
+        if (error) throw new Error('No se pudo analizar el audio: ' + error);
         for (const p of prediction) {
             const prev = bySpecies.get(p.sciName);
             if (!prev || p.confidence > prev.confidence) bySpecies.set(p.sciName, p);
@@ -1751,6 +1834,12 @@ recordBtn.addEventListener('click', run);
         console.error(e);
         setError('No se ha podido cargar el modelo: ' + (e.message || e));
         setStatus('');
+        showBar(false);
+        // El botón pasa a "Reintentar": recarga la página (el modelo ya
+        // descargado sale de la caché, así que es rápido).
+        btnLabel.textContent = 'Reintentar';
+        recordBtn.disabled = false;
+        recordBtn.addEventListener('click', () => location.reload(), { once: true });
     }
 })();
 </script>
